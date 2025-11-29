@@ -28,42 +28,7 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 
 ## 🚀 Quick Start (5 minutes)
 
-### Option A: Run with Docker 🐳 (Recommended)
-
-```bash
-# Clone the repo
-git clone https://github.com/Gururagavendra/gmail-cleaner.git
-cd gmail-cleaner
-
-# Add your credentials.json (see Step 2 below for how to get it)
-# Then run:
-docker compose up -d
-
-# Open http://localhost:8766
-# Click "Sign In" → Check docker logs for OAuth URL:
-docker logs cleanup_email-gmail-cleaner-1
-```
-
-### Option B: Run with Python
-
-```bash
-git clone https://github.com/Gururagavendra/gmail-cleaner.git
-cd gmail-cleaner
-
-# Option 1: Using uv (recommended - faster)
-uv sync
-uv run python main.py
-
-# Option 2: Using pip
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install google-auth google-auth-oauthlib google-api-python-client
-python main.py
-```
-
-🎉 The app opens at `http://localhost:8766`
-
-### Step 2: Set up Google Cloud OAuth (one-time setup)
+### Step 1: Set up Google Cloud OAuth (one-time)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select existing)
@@ -77,17 +42,34 @@ python main.py
    - Download the JSON file
    - Rename to `credentials.json` and put in project folder
 
-### Step 3: Run the app
+### Step 2: Clone & Run
 
-**With Docker:**
+```bash
+git clone https://github.com/Gururagavendra/gmail-cleaner.git
+cd gmail-cleaner
+# Put your credentials.json in this folder
+```
+
+**Option A: Docker 🐳 (Recommended)**
 ```bash
 docker compose up -d
-# Check logs for OAuth URL when signing in:
+
+# Open http://localhost:8766
+# Click "Sign In" → Check docker logs for OAuth URL:
 docker logs cleanup_email-gmail-cleaner-1
 ```
 
-**With Python:**
+**Option B: Python with uv (fast)**
 ```bash
+uv sync
+uv run python main.py
+```
+
+**Option C: Python with pip**
+```bash
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install google-auth google-auth-oauthlib google-api-python-client
 python main.py
 ```
 
