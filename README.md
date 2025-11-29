@@ -50,14 +50,14 @@ docker logs cleanup_email-gmail-cleaner-1
 git clone https://github.com/Gururagavendra/gmail-cleaner.git
 cd gmail-cleaner
 
-# Create virtual environment
+# Option 1: Using uv (recommended - faster)
+uv sync
+uv run python main.py
+
+# Option 2: Using pip
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install google-auth google-auth-oauthlib google-api-python-client
-
-# Run!
 python main.py
 ```
 
