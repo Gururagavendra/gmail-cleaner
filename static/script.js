@@ -10,6 +10,7 @@ let currentView = 'login';
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     checkAuthStatus();
+    checkWebAuthMode();
     setupNavigation();
 });
 
@@ -61,6 +62,23 @@ async function pollAuthStatus() {
         updateAuthUI(status);
     } else {
         setTimeout(pollAuthStatus, 1000);
+    }
+}
+
+// ============== Web Auth (Docker/Headless) ==============
+
+async function checkWebAuthMode() {
+    try {
+        const response = await fetch('/api/web-auth-status');
+        const status = await response.json();
+        
+        // If in Docker mode and needs setup, show instructions
+        if (status.web_auth_mode && status.needs_setup) {
+            document.getElementById('dockerSetupSection')?.classList.remove('hidden');
+            document.getElementById('signInBtn')?.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Error checking web auth mode:', error);
     }
 }
 

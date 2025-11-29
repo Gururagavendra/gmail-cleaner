@@ -86,12 +86,33 @@
                         </div>
                         <h2>Sign in to get started</h2>
                         <p>Connect your Gmail account to scan for unsubscribe links</p>
-                        <button class="btn btn-primary btn-large" onclick="signIn()">
+                        <button class="btn btn-primary btn-large" onclick="signIn()" id="signInBtn">
                             <svg viewBox="0 0 24 24" width="20" height="20">
                                 <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
                             </svg>
                             Sign in with Google
                         </button>
+                        
+                        <!-- Docker Setup Message -->
+                        <div id="dockerSetupSection" class="web-auth-section hidden">
+                            <div class="web-auth-divider">
+                                <span>Docker Setup Required</span>
+                            </div>
+                            <div class="web-auth-steps">
+                                <p>🐳 <strong>Running in Docker?</strong></p>
+                                <p>You need to generate a token file first:</p>
+                                <ol style="margin: 16px 0; padding-left: 20px; text-align: left;">
+                                    <li>Run the app locally once (not in Docker)</li>
+                                    <li>Sign in with Google - this creates <code>token.json</code></li>
+                                    <li>Mount the token file in Docker:<br>
+                                        <code style="font-size: 12px;">-v ./token.json:/app/token.json</code>
+                                    </li>
+                                </ol>
+                                <p style="font-size: 13px; color: var(--text-muted);">
+                                    The token auto-refreshes, so you only need to do this once!
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

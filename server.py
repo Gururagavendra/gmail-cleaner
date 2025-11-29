@@ -61,6 +61,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == '/api/auth-status':
             self.send_json(gmail_api.check_login_status())
         
+        elif path == '/api/web-auth-status':
+            self.send_json(gmail_api.get_web_auth_status())
+        
         elif path == '/api/unread-count':
             self.send_json(gmail_api.get_unread_count())
         

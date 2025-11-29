@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from googleapiclient.discovery import build
 
 # Gmail API scopes - read and modify for marking as read
@@ -26,6 +26,29 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googlea
 current_user = {"email": None, "logged_in": False}
 scan_results = []
 scan_status = {"progress": 0, "message": "Ready", "done": False, "error": None}
+
+def is_web_auth_mode():
+    """Check if we should use web-based auth (for Docker/headless)."""
+    return os.environ.get('WEB_AUTH', '').lower() == 'true'
+
+def needs_auth_setup():
+    """Check if authentication is needed."""
+    if os.path.exists('token.json'):
+        try:
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+            if creds and (creds.valid or creds.refresh_token):
+                return False
+        except:
+            pass
+    return True
+
+def get_web_auth_status():
+    """Get current web auth status."""
+    return {
+        "needs_setup": needs_auth_setup(),
+        "web_auth_mode": is_web_auth_mode(),
+        "has_credentials": os.path.exists('credentials.json')
+    }
 
 
 import json
@@ -57,16 +80,22 @@ def get_gmail_service():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
         else:
+            # In web auth mode, don't try to open browser
+            if is_web_auth_mode():
+                return None, "AUTH_REQUIRED"
+            
             creds_path = get_credentials_path()
             if not creds_path:
                 return None, "credentials.json not found! Please follow setup instructions."
             
             flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
             creds = flow.run_local_server(port=0)
-        
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+            
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
     
     service = build('gmail', 'v1', credentials=creds)
     

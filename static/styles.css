@@ -803,3 +803,89 @@ body {
     color: var(--text-secondary);
     margin-top: 4px;
 }
+
+/* Web Auth Section (Docker/headless) */
+.web-auth-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    text-align: left;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.web-auth-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 24px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.web-auth-divider::before,
+.web-auth-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.web-auth-divider span {
+    padding: 0 16px;
+}
+
+.web-auth-steps {
+    background: var(--hover-bg);
+    padding: 20px;
+    border-radius: var(--radius-md);
+}
+
+.web-auth-steps p {
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.web-auth-url {
+    margin-top: 16px;
+}
+
+.url-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.url-box input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: monospace;
+    background: white;
+}
+
+.code-input-row {
+    display: flex;
+    gap: 8px;
+}
+
+.code-input-row input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+}
+
+.error-text {
+    color: var(--danger-color);
+    font-size: 13px;
+    margin-top: 12px;
+}
+
+.success-text {
+    color: var(--success-color);
+    font-size: 13px;
+    margin-top: 12px;
+}
