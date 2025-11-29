@@ -19,6 +19,12 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 | ⚡ **Super Fast** | Gmail API with batch requests (100 emails per API call) |
 | 🎨 **Gmail-style UI** | Clean, familiar interface |
 
+## 🎬 Demo
+
+![Gmail Cleaner Demo](demo.gif)
+
+*Scan senders → Select → Delete thousands of emails in seconds!*
+
 ## 🚀 Quick Start (5 minutes)
 
 ### Step 1: Clone this repo
