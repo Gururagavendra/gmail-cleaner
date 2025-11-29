@@ -30,7 +30,7 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 ### Step 1: Clone this repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/gmail-unsubscribe.git
+git clone https://github.com/Gururagavendra/gmail-unsubscribe.git
 cd gmail-unsubscribe
 ```
 

@@ -7,6 +7,8 @@ Handles all Gmail API interactions: authentication, email scanning, unsubscribe.
 import os
 import re
 import base64
+import json
+import time
 import urllib.request
 import ssl
 from collections import defaultdict
@@ -241,6 +243,10 @@ def scan_emails(limit=500):
             progress = int((i + len(batch_ids)) / total * 100)
             scan_status["progress"] = progress
             scan_status["message"] = f"Scanned {processed}/{total} emails ({len(unsubscribe_data)} senders found)"
+            
+            # Rate limiting - small delay every 5 batches (500 emails)
+            if (i // batch_size + 1) % 5 == 0:
+                time.sleep(0.5)
         
         # Sort by count
         sorted_results = sorted(
@@ -564,6 +570,10 @@ def scan_senders_for_delete(limit=1000):
             progress = int((i + len(batch_ids)) / total * 100)
             delete_scan_status["progress"] = progress
             delete_scan_status["message"] = f"Scanned {processed}/{total} emails ({len(sender_data)} senders)"
+            
+            # Rate limiting - small delay every 5 batches (500 emails)
+            if (i // batch_size + 1) % 5 == 0:
+                time.sleep(0.5)
         
         # Sort by count (highest first)
         sorted_results = sorted(
@@ -587,7 +597,7 @@ def scan_senders_for_delete(limit=1000):
 
 
 def delete_emails_by_sender(sender_email):
-    """Delete all emails from a specific sender - FAST with batchDelete."""
+    """Delete all emails from a specific sender - with rate limiting."""
     global delete_scan_results
     
     service, error = get_gmail_service()
@@ -609,14 +619,13 @@ def delete_emails_by_sender(sender_email):
     try:
         msg_ids = sender_data["msg_ids"]
         total = len(msg_ids)
-        
-        # Use batchDelete for permanent delete OR batchModify for trash
-        # batchModify to trash is safer (can recover)
-        # Process in chunks of 1000 (Gmail limit)
         deleted = 0
         
-        for i in range(0, len(msg_ids), 1000):
-            batch_ids = msg_ids[i:i + 1000]
+        # Process in chunks of 500 (safer for rate limits)
+        chunk_size = 500
+        
+        for i in range(0, len(msg_ids), chunk_size):
+            batch_ids = msg_ids[i:i + chunk_size]
             
             service.users().messages().batchModify(
                 userId='me',
@@ -627,10 +636,13 @@ def delete_emails_by_sender(sender_email):
             ).execute()
             
             deleted += len(batch_ids)
+            
+            # Rate limiting - wait 1 second between batches
+            if i + chunk_size < len(msg_ids):
+                time.sleep(1)
         
         # Remove from results immediately
-        if sender_index is not None:
-            delete_scan_results = [r for r in delete_scan_results if r["email"] != sender_email]
+        delete_scan_results = [r for r in delete_scan_results if r["email"] != sender_email]
         
         return {
             "success": True,
@@ -644,7 +656,7 @@ def delete_emails_by_sender(sender_email):
 
 
 def delete_emails_bulk(sender_emails):
-    """Delete emails from multiple senders in parallel - MUCH FASTER."""
+    """Delete emails from multiple senders - with rate limiting."""
     global delete_scan_results
     
     service, error = get_gmail_service()
@@ -669,9 +681,11 @@ def delete_emails_bulk(sender_emails):
         total = len(all_msg_ids)
         deleted = 0
         
-        # Delete ALL in one go (batch of 1000 at a time)
-        for i in range(0, len(all_msg_ids), 1000):
-            batch_ids = all_msg_ids[i:i + 1000]
+        # Process in chunks of 500 with rate limiting
+        chunk_size = 500
+        
+        for i in range(0, len(all_msg_ids), chunk_size):
+            batch_ids = all_msg_ids[i:i + chunk_size]
             
             service.users().messages().batchModify(
                 userId='me',
@@ -682,6 +696,10 @@ def delete_emails_bulk(sender_emails):
             ).execute()
             
             deleted += len(batch_ids)
+            
+            # Rate limiting - wait 1 second between batches
+            if i + chunk_size < len(all_msg_ids):
+                time.sleep(1)
         
         # Remove all deleted senders from results
         delete_scan_results = [r for r in delete_scan_results if r["email"] not in senders_found]
@@ -691,16 +709,6 @@ def delete_emails_bulk(sender_emails):
             "deleted": deleted,
             "senders": len(senders_found),
             "message": f"Moved {deleted} emails from {len(senders_found)} senders to trash"
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-        
-        return {
-            "success": True,
-            "deleted": deleted,
-            "sender": sender_email,
-            "message": f"Moved {deleted} emails to trash"
         }
         
     except Exception as e:
