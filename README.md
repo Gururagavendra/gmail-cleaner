@@ -29,7 +29,7 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 ## Prerequisites
 
 - [Google Cloud Project](https://console.cloud.google.com/) with Gmail API enabled
-- \`credentials.json\` file (OAuth 2.0 Client ID)
+- `credentials.json` file (OAuth 2.0 Client ID)
 - Docker **OR** Python 3.9+
 
 ## Installation
@@ -46,50 +46,49 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 5. Go to **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**
    - Application type: **Desktop app**
    - Download the JSON file
-   - Rename to \`credentials.json\`
+   - Rename to `credentials.json`
 
 ### 2. Clone the Repository
 
-\`\`\`bash
+```bash
 git clone https://github.com/Gururagavendra/gmail-cleaner.git
 cd gmail-cleaner
-\`\`\`
+```
 
-Put your \`credentials.json\` file in the project folder.
+Put your `credentials.json` file in the project folder.
 
 ## Usage
 
 ### Docker (Recommended)
 
-\`\`\`bash
+```bash
 docker compose up -d
-\`\`\`
+```
 
 Open http://localhost:8766 in your browser.
 
-**First-time sign-in:**
-\`\`\`bash
-# Click "Sign In" in the web UI, then check logs for OAuth URL:
+**First-time sign-in:** Click "Sign In" in the web UI, then check logs for the OAuth URL:
+```bash
 docker logs cleanup_email-gmail-cleaner-1
-\`\`\`
+```
 
 Copy the URL from logs, open in browser, and authorize.
 
 ### Python (with uv)
 
-\`\`\`bash
+```bash
 uv sync
 uv run python main.py
-\`\`\`
+```
 
 ### Python (with pip)
 
-\`\`\`bash
+```bash
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install google-auth google-auth-oauthlib google-api-python-client
 python main.py
-\`\`\`
+```
 
 The app opens at http://localhost:8766
 
@@ -99,7 +98,7 @@ The Docker setup exposes two ports:
 - **8766**: Web UI
 - **8767**: OAuth callback (for authentication)
 
-\`\`\`yaml
+```yaml
 services:
   gmail-cleaner:
     build: .
@@ -109,11 +108,11 @@ services:
     volumes:
       - ./credentials.json:/app/credentials.json:ro
       - ./token.json:/app/token.json  # Persists login
-\`\`\`
+```
 
 ## Project Structure
 
-\`\`\`
+```
 gmail-cleaner/
 ├── main.py              # Entry point
 ├── server.py            # HTTP server
@@ -128,7 +127,7 @@ gmail-cleaner/
 │   └── script.js
 ├── credentials.json     # Your OAuth creds (not in git)
 └── token.json           # Auth token (not in git)
-\`\`\`
+```
 
 ## Security & Privacy
 
@@ -136,7 +135,7 @@ gmail-cleaner/
 - ✅ **Open Source** - Inspect all the code yourself
 - ✅ **Minimal Permissions** - Only requests read + modify (for mark as read)
 - ✅ **Your Credentials** - You control your own Google OAuth app
-- ✅ **Gitignored Secrets** - \`credentials.json\` and \`token.json\` never get committed
+- ✅ **Gitignored Secrets** - `credentials.json` and `token.json` never get committed
 
 ## FAQ
 
