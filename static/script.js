@@ -45,41 +45,86 @@ function updateAuthUI(authStatus) {
 }
 
 async function signIn() {
+    const signInBtn = document.getElementById('signInBtn');
+    
+    // Disable button to prevent multiple clicks
+    if (signInBtn) {
+        signInBtn.disabled = true;
+        signInBtn.innerHTML = '<span>Signing in...</span>';
+    }
+    
     try {
-        const response = await fetch('/api/sign-in', { method: 'POST' });
+        // Check if we're likely in Docker (WEB_AUTH mode)
+        const statusResp = await fetch('/api/web-auth-status');
+        const status = await statusResp.json();
+        
+        if (status.web_auth_mode) {
+            // In Docker - show instructions to check logs
+            const msg = `Docker detected! To sign in:
+
+1. Check Docker logs for the authorization URL:
+   docker logs cleanup_email-gmail-cleaner-1
+
+2. Copy the URL and open it in your browser
+
+3. After authorizing, you'll be signed in automatically.
+
+(Or generate token.json locally and mount it)`;
+            alert(msg);
+        }
+        
+        // Trigger sign-in - this starts the OAuth callback server
+        fetch('/api/sign-in', { method: 'POST' });
+        
         // Poll for login completion
         pollAuthStatus();
     } catch (error) {
         alert('Error signing in: ' + error.message);
+        // Re-enable button on error
+        if (signInBtn) {
+            signInBtn.disabled = false;
+            signInBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20">
+                <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+            </svg>
+            Sign in with Google`;
+        }
     }
 }
 
-async function pollAuthStatus() {
-    const response = await fetch('/api/auth-status');
-    const status = await response.json();
+async function pollAuthStatus(attempts = 0) {
+    const maxAttempts = 120; // 2 minutes timeout
+    const signInBtn = document.getElementById('signInBtn');
     
-    if (status.logged_in) {
-        updateAuthUI(status);
-    } else {
-        setTimeout(pollAuthStatus, 1000);
+    try {
+        const response = await fetch('/api/auth-status');
+        const status = await response.json();
+        
+        if (status.logged_in) {
+            updateAuthUI(status);
+        } else if (attempts < maxAttempts) {
+            setTimeout(() => pollAuthStatus(attempts + 1), 1000);
+        } else {
+            // Timeout - re-enable button
+            if (signInBtn) {
+                signInBtn.disabled = false;
+                signInBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20">
+                    <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+                </svg>
+                Sign in with Google`;
+            }
+            alert('Sign-in timed out. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error polling auth status:', error);
+        setTimeout(() => pollAuthStatus(attempts + 1), 1000);
     }
 }
 
 // ============== Web Auth (Docker/Headless) ==============
 
 async function checkWebAuthMode() {
-    try {
-        const response = await fetch('/api/web-auth-status');
-        const status = await response.json();
-        
-        // If in Docker mode and needs setup, show instructions
-        if (status.web_auth_mode && status.needs_setup) {
-            document.getElementById('dockerSetupSection')?.classList.remove('hidden');
-            document.getElementById('signInBtn')?.classList.add('hidden');
-        }
-    } catch (error) {
-        console.error('Error checking web auth mode:', error);
-    }
+    // No longer needed - sign in works everywhere now!
+    return;
 }
 
 async function signOut() {

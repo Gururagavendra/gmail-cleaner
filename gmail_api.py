@@ -11,6 +11,7 @@ import json
 import time
 import urllib.request
 import ssl
+import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -26,6 +27,8 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googlea
 current_user = {"email": None, "logged_in": False}
 scan_results = []
 scan_status = {"progress": 0, "message": "Ready", "done": False, "error": None}
+pending_auth_url = {"url": None}  # Store pending OAuth URL for web UI
+auth_in_progress = {"active": False}  # Prevent multiple OAuth attempts
 
 def is_web_auth_mode():
     """Check if we should use web-based auth (for Docker/headless)."""
@@ -47,8 +50,13 @@ def get_web_auth_status():
     return {
         "needs_setup": needs_auth_setup(),
         "web_auth_mode": is_web_auth_mode(),
-        "has_credentials": os.path.exists('credentials.json')
+        "has_credentials": os.path.exists('credentials.json'),
+        "pending_auth_url": pending_auth_url["url"]
     }
+
+
+# OAuth callback port - fixed for Docker compatibility
+OAUTH_PORT = 8767
 
 
 import json
@@ -83,19 +91,50 @@ def get_gmail_service():
             with open('token.json', 'w') as token:
                 token.write(creds.to_json())
         else:
-            # In web auth mode, don't try to open browser
-            if is_web_auth_mode():
-                return None, "AUTH_REQUIRED"
+            # Prevent multiple OAuth attempts
+            if auth_in_progress["active"]:
+                return None, "Sign-in already in progress. Please complete the authorization in your browser."
             
             creds_path = get_credentials_path()
             if not creds_path:
                 return None, "credentials.json not found! Please follow setup instructions."
             
-            flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
-            creds = flow.run_local_server(port=0)
+            # Start OAuth in background thread so Flask stays responsive
+            auth_in_progress["active"] = True
             
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
+            def run_oauth():
+                try:
+                    # Use fixed port 8767 for OAuth callback (works with Docker port mapping)
+                    flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
+                    
+                    # Check if we're in Docker (no display) or local
+                    import shutil
+                    has_browser = shutil.which('xdg-open') or shutil.which('open') or os.environ.get('DISPLAY')
+                    
+                    # For Docker: bind to 0.0.0.0 so callback can reach container
+                    # For local: bind to localhost for security
+                    bind_address = "0.0.0.0" if is_web_auth_mode() else "localhost"
+                    
+                    # run_local_server handles everything - generates URL, starts callback server
+                    creds = flow.run_local_server(
+                        port=OAUTH_PORT, 
+                        bind_addr=bind_address,
+                        open_browser=has_browser
+                    )
+                    
+                    with open('token.json', 'w') as token:
+                        token.write(creds.to_json())
+                    print("✅ OAuth complete! Token saved.")
+                except Exception as e:
+                    print(f"❌ OAuth error: {e}")
+                finally:
+                    auth_in_progress["active"] = False
+                    pending_auth_url["url"] = None
+            
+            oauth_thread = threading.Thread(target=run_oauth, daemon=True)
+            oauth_thread.start()
+            
+            return None, "Sign-in started. Please complete authorization in your browser (check logs for URL)."
     
     service = build('gmail', 'v1', credentials=creds)
     

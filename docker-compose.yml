@@ -1,16 +1,12 @@
-version: '3.8'
-
 services:
   gmail-cleaner:
     build: .
     ports:
-      - "8766:8766"
+      - "8766:8766"  # Web UI
+      - "8767:8767"  # OAuth callback
     volumes:
       # Mount credentials file (required)
       - ./credentials.json:/app/credentials.json:ro
-      # Mount token file to persist auth (optional - can use web auth instead)
-      - ./token.json:/app/token.json
-    environment:
-      # Set to 'true' to enable web-based OAuth (for Docker/headless)
-      - WEB_AUTH=true
+      # Optionally mount token file to persist auth across restarts
+      # - ./token.json:/app/token.json
     restart: unless-stopped

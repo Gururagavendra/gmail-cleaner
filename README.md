@@ -2,7 +2,8 @@
 
 A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails by sender, and mark emails as read. No subscriptions, no data collection - runs 100% on your machine.
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue?style=flat-square&logo=python)
+![Python](https://img.shields.io/badge/Python-3.9+-blue?style=flat-square&logo=python)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)
 ![Gmail API](https://img.shields.io/badge/Gmail-API-EA4335?style=flat-square&logo=gmail)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
@@ -27,12 +28,40 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 
 ## 🚀 Quick Start (5 minutes)
 
-### Step 1: Clone this repo
+### Option A: Run with Docker 🐳 (Recommended)
 
 ```bash
-git clone https://github.com/Gururagavendra/gmail-unsubscribe.git
-cd gmail-unsubscribe
+# Clone the repo
+git clone https://github.com/Gururagavendra/gmail-cleaner.git
+cd gmail-cleaner
+
+# Add your credentials.json (see Step 2 below for how to get it)
+# Then run:
+docker compose up -d
+
+# Open http://localhost:8766
+# Click "Sign In" → Check docker logs for OAuth URL:
+docker logs cleanup_email-gmail-cleaner-1
 ```
+
+### Option B: Run with Python
+
+```bash
+git clone https://github.com/Gururagavendra/gmail-cleaner.git
+cd gmail-cleaner
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install google-auth google-auth-oauthlib google-api-python-client
+
+# Run!
+python main.py
+```
+
+🎉 The app opens at `http://localhost:8766`
 
 ### Step 2: Set up Google Cloud OAuth (one-time setup)
 
@@ -48,30 +77,57 @@ cd gmail-unsubscribe
    - Download the JSON file
    - Rename to `credentials.json` and put in project folder
 
-### Step 3: Install & Run
+### Step 3: Run the app
 
+**With Docker:**
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+docker compose up -d
+# Check logs for OAuth URL when signing in:
+docker logs cleanup_email-gmail-cleaner-1
+```
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run!
+**With Python:**
+```bash
 python main.py
 ```
 
 🎉 The app opens at `http://localhost:8766`
 
+## 🐳 Docker Details
+
+The Docker setup exposes two ports:
+- **8766**: Web UI
+- **8767**: OAuth callback (for authentication)
+
+```yaml
+# docker-compose.yml
+services:
+  gmail-cleaner:
+    build: .
+    ports:
+      - "8766:8766"  # Web UI
+      - "8767:8767"  # OAuth callback
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./token.json:/app/token.json  # Persists login
+```
+
+**First-time sign-in with Docker:**
+1. Open http://localhost:8766 and click "Sign In"
+2. Run `docker logs cleanup_email-gmail-cleaner-1` to get the OAuth URL
+3. Open the URL in your browser and authorize
+4. You're signed in! Token is saved for future sessions.
+
 ## 📁 Project Structure
 
 ```
-gmail-unsubscribe/
+gmail-cleaner/
 ├── main.py              # Entry point - run this!
 ├── server.py            # HTTP server
 ├── gmail_api.py         # Gmail API functions
-├── requirements.txt     # Python dependencies
+├── pyproject.toml       # Python dependencies
+├── Dockerfile           # Docker build
+├── docker-compose.yml   # Docker compose config
 ├── templates/
 │   └── index.html       # Main HTML template
 ├── static/
@@ -105,9 +161,11 @@ gmail-unsubscribe/
 
 ## 🛠️ Tech Stack
 
-- **Backend**: Python 3, Gmail API
+- **Backend**: Python 3.11, Gmail API
 - **Frontend**: Vanilla HTML/CSS/JS (no frameworks)
 - **Auth**: Google OAuth 2.0
+- **Package Manager**: uv (fast Python package installer)
+- **Containerization**: Docker + Docker Compose
 
 ## 📝 License
 

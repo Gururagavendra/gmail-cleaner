@@ -92,27 +92,6 @@
                             </svg>
                             Sign in with Google
                         </button>
-                        
-                        <!-- Docker Setup Message -->
-                        <div id="dockerSetupSection" class="web-auth-section hidden">
-                            <div class="web-auth-divider">
-                                <span>Docker Setup Required</span>
-                            </div>
-                            <div class="web-auth-steps">
-                                <p>🐳 <strong>Running in Docker?</strong></p>
-                                <p>You need to generate a token file first:</p>
-                                <ol style="margin: 16px 0; padding-left: 20px; text-align: left;">
-                                    <li>Run the app locally once (not in Docker)</li>
-                                    <li>Sign in with Google - this creates <code>token.json</code></li>
-                                    <li>Mount the token file in Docker:<br>
-                                        <code style="font-size: 12px;">-v ./token.json:/app/token.json</code>
-                                    </li>
-                                </ol>
-                                <p style="font-size: 13px; color: var(--text-muted);">
-                                    The token auto-refreshes, so you only need to do this once!
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
