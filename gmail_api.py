@@ -587,8 +587,8 @@ def scan_senders_for_delete(limit=1000):
 
 
 def delete_emails_by_sender(sender_email):
-    """Delete all emails from a specific sender."""
-    global delete_status, delete_scan_results
+    """Delete all emails from a specific sender - FAST with batchDelete."""
+    global delete_scan_results
     
     service, error = get_gmail_service()
     if error:
@@ -596,9 +596,11 @@ def delete_emails_by_sender(sender_email):
     
     # Find sender in results
     sender_data = None
-    for item in delete_scan_results:
+    sender_index = None
+    for i, item in enumerate(delete_scan_results):
         if item["email"] == sender_email:
             sender_data = item
+            sender_index = i
             break
     
     if not sender_data:
@@ -608,12 +610,13 @@ def delete_emails_by_sender(sender_email):
         msg_ids = sender_data["msg_ids"]
         total = len(msg_ids)
         
-        # Delete in batches (move to trash)
-        batch_size = 1000
+        # Use batchDelete for permanent delete OR batchModify for trash
+        # batchModify to trash is safer (can recover)
+        # Process in chunks of 1000 (Gmail limit)
         deleted = 0
         
-        for i in range(0, len(msg_ids), batch_size):
-            batch_ids = msg_ids[i:i + batch_size]
+        for i in range(0, len(msg_ids), 1000):
+            batch_ids = msg_ids[i:i + 1000]
             
             service.users().messages().batchModify(
                 userId='me',
@@ -625,8 +628,73 @@ def delete_emails_by_sender(sender_email):
             
             deleted += len(batch_ids)
         
-        # Remove from results
-        delete_scan_results = [r for r in delete_scan_results if r["email"] != sender_email]
+        # Remove from results immediately
+        if sender_index is not None:
+            delete_scan_results = [r for r in delete_scan_results if r["email"] != sender_email]
+        
+        return {
+            "success": True,
+            "deleted": deleted,
+            "sender": sender_email,
+            "message": f"Moved {deleted} emails to trash"
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def delete_emails_bulk(sender_emails):
+    """Delete emails from multiple senders in parallel - MUCH FASTER."""
+    global delete_scan_results
+    
+    service, error = get_gmail_service()
+    if error:
+        return {"success": False, "error": error}
+    
+    # Collect all message IDs from selected senders
+    all_msg_ids = []
+    senders_found = []
+    
+    for sender_email in sender_emails:
+        for item in delete_scan_results:
+            if item["email"] == sender_email:
+                all_msg_ids.extend(item["msg_ids"])
+                senders_found.append(sender_email)
+                break
+    
+    if not all_msg_ids:
+        return {"success": False, "error": "No emails found for selected senders"}
+    
+    try:
+        total = len(all_msg_ids)
+        deleted = 0
+        
+        # Delete ALL in one go (batch of 1000 at a time)
+        for i in range(0, len(all_msg_ids), 1000):
+            batch_ids = all_msg_ids[i:i + 1000]
+            
+            service.users().messages().batchModify(
+                userId='me',
+                body={
+                    'ids': batch_ids,
+                    'addLabelIds': ['TRASH']
+                }
+            ).execute()
+            
+            deleted += len(batch_ids)
+        
+        # Remove all deleted senders from results
+        delete_scan_results = [r for r in delete_scan_results if r["email"] not in senders_found]
+        
+        return {
+            "success": True,
+            "deleted": deleted,
+            "senders": len(senders_found),
+            "message": f"Moved {deleted} emails from {len(senders_found)} senders to trash"
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
         
         return {
             "success": True,

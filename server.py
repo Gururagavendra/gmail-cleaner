@@ -130,6 +130,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             result = gmail_api.delete_emails_by_sender(sender)
             self.send_json(result)
         
+        elif path == '/api/delete-emails-bulk':
+            senders = body.get('senders', [])
+            result = gmail_api.delete_emails_bulk(senders)
+            self.send_json(result)
+        
         else:
             self.send_error(404)
     

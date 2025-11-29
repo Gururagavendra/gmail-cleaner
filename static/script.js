@@ -717,54 +717,71 @@ async function deleteSelectedSenders() {
         return;
     }
     
-    // Calculate total emails
+    // Calculate total emails and collect sender emails
     let totalEmails = 0;
-    const senders = [];
+    const senderEmails = [];
     checkboxes.forEach(cb => {
         const index = parseInt(cb.dataset.index);
         const r = deleteResults[index];
         totalEmails += r.count;
-        senders.push(r.email);
+        senderEmails.push(r.email);
     });
     
     if (!confirm(`Delete ${totalEmails} emails from ${checkboxes.length} senders?\n\nThis will move them to Trash.`)) {
         return;
     }
     
-    // Delete one by one
-    for (let i = 0; i < checkboxes.length; i++) {
-        const cb = checkboxes[i];
+    // Disable all selected buttons
+    checkboxes.forEach(cb => {
         const index = parseInt(cb.dataset.index);
-        const r = deleteResults[index];
         const btn = document.getElementById('delete-' + index);
-        
         if (btn) {
             btn.disabled = true;
             btn.textContent = 'Deleting...';
         }
-        
-        try {
-            const response = await fetch('/api/delete-emails', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sender: r.email })
-            });
-            const result = await response.json();
-            
-            if (result.success && btn) {
-                btn.textContent = '✓ Deleted!';
-                btn.classList.add('success');
-            }
-        } catch (error) {
-            console.error('Error deleting:', error);
-        }
-    }
+    });
     
-    // Refresh results
-    setTimeout(async () => {
-        const resultsResponse = await fetch('/api/delete-scan-results');
-        deleteResults = await resultsResponse.json();
-        displayDeleteResults();
-        document.getElementById('deleteSelectAll').checked = false;
-    }, 500);
+    try {
+        // Use BULK delete - much faster!
+        const response = await fetch('/api/delete-emails-bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senders: senderEmails })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            // Mark all as done
+            checkboxes.forEach(cb => {
+                const index = parseInt(cb.dataset.index);
+                const btn = document.getElementById('delete-' + index);
+                if (btn) {
+                    btn.textContent = '✓ Deleted!';
+                    btn.classList.add('success');
+                }
+            });
+            
+            // Refresh results after short delay
+            setTimeout(async () => {
+                const resultsResponse = await fetch('/api/delete-scan-results');
+                deleteResults = await resultsResponse.json();
+                displayDeleteResults();
+                document.getElementById('deleteSelectAll').checked = false;
+            }, 800);
+        } else {
+            alert('Error: ' + result.error);
+            // Re-enable buttons
+            checkboxes.forEach(cb => {
+                const index = parseInt(cb.dataset.index);
+                const r = deleteResults[index];
+                const btn = document.getElementById('delete-' + index);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = `🗑️ Delete ${r.count}`;
+                }
+            });
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
 }
