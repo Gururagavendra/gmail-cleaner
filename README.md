@@ -26,15 +26,9 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 
 *Scan senders → Select → Delete thousands of emails in seconds!*
 
-## Prerequisites
+## Setup
 
-- [Google Cloud Project](https://console.cloud.google.com/) with Gmail API enabled
-- `credentials.json` file (OAuth 2.0 Client ID)
-- Docker **OR** Python 3.9+
-
-## Installation
-
-### 1. Get Google OAuth Credentials (one-time setup)
+### 1. Get Google OAuth Credentials
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select existing)
@@ -59,7 +53,7 @@ Put your `credentials.json` file in the project folder.
 
 ## Usage
 
-### Docker (Recommended)
+### Option A: Docker (Recommended)
 
 ```bash
 docker compose up -d
@@ -74,60 +68,14 @@ docker logs cleanup_email-gmail-cleaner-1
 
 Copy the URL from logs, open in browser, and authorize.
 
-### Python (with uv)
+### Option B: Python (with uv)
 
 ```bash
 uv sync
 uv run python main.py
 ```
 
-### Python (with pip)
-
-```bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install google-auth google-auth-oauthlib google-api-python-client
-python main.py
-```
-
 The app opens at http://localhost:8766
-
-## Docker Configuration
-
-The Docker setup exposes two ports:
-- **8766**: Web UI
-- **8767**: OAuth callback (for authentication)
-
-```yaml
-services:
-  gmail-cleaner:
-    build: .
-    ports:
-      - "8766:8766"
-      - "8767:8767"
-    volumes:
-      - ./credentials.json:/app/credentials.json:ro
-      - ./token.json:/app/token.json  # Persists login
-```
-
-## Project Structure
-
-```
-gmail-cleaner/
-├── main.py              # Entry point
-├── server.py            # HTTP server
-├── gmail_api.py         # Gmail API functions
-├── pyproject.toml       # Python dependencies
-├── Dockerfile
-├── docker-compose.yml
-├── templates/
-│   └── index.html
-├── static/
-│   ├── styles.css
-│   └── script.js
-├── credentials.json     # Your OAuth creds (not in git)
-└── token.json           # Auth token (not in git)
-```
 
 ## Security & Privacy
 
@@ -150,14 +98,6 @@ gmail-cleaner/
 
 **Q: Emails went to Trash, can I recover them?**
 > Yes! The delete feature moves emails to Trash. Go to Gmail → Trash to recover within 30 days.
-
-## Tech Stack
-
-- **Backend**: Python 3.11, Gmail API
-- **Frontend**: Vanilla HTML/CSS/JS (no frameworks)
-- **Auth**: Google OAuth 2.0
-- **Package Manager**: uv
-- **Containerization**: Docker
 
 ## Contributing
 
