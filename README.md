@@ -30,8 +30,8 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 ### Step 1: Clone this repo
 
 ```bash
-git clone https://github.com/Gururagavendra/gmail-unsubscribe.git
-cd gmail-unsubscribe
+git clone https://github.com/Gururagavendra/gmail-cleaner.git
+cd gmail-cleaner
 ```
 
 ### Step 2: Set up Google Cloud OAuth (one-time setup)
@@ -67,7 +67,7 @@ python main.py
 ## 📁 Project Structure
 
 ```
-gmail-unsubscribe/
+gmail-cleaner/
 ├── main.py              # Entry point - run this!
 ├── server.py            # HTTP server
 ├── gmail_api.py         # Gmail API functions
