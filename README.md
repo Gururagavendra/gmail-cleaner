@@ -29,6 +29,10 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 
 ## Setup
 
+> ⚠️ **Important**: You must create your **OWN** Google Cloud credentials.  
+> This app doesn't include pre-configured OAuth - that's what makes it privacy-focused!  
+> Each user runs their own instance with their own credentials.
+
 ### 1. Get Google OAuth Credentials
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
@@ -99,6 +103,34 @@ The app opens at http://localhost:8766
 
 **Q: Emails went to Trash, can I recover them?**
 > Yes! The delete feature moves emails to Trash. Go to Gmail → Trash to recover within 30 days.
+
+## Troubleshooting
+
+### "Access blocked: Gmail Cleanup has not completed the Google verification process"
+
+This error means you're missing a step in the OAuth setup:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → Your Project
+2. Go to **APIs & Services** → **OAuth consent screen**
+3. Scroll down to **Test users**
+4. Click **Add Users** and add your Gmail address
+5. Try signing in again
+
+> 💡 **Why?** Since your app is in "Testing" mode, only emails listed as test users can sign in. This is normal and expected!
+
+### "Error 403: access_denied"
+
+- Make sure you created your **own** Google Cloud project and credentials
+- Make sure your email is added as a **Test user**
+- Make sure you downloaded `credentials.json` and placed it in the project folder
+
+### Docker: "Where do I find the OAuth URL?"
+
+Check the container logs:
+```bash
+docker logs cleanup_email-gmail-cleaner-1
+```
+Look for a URL starting with `https://accounts.google.com/o/oauth2/...`
 
 ## Contributing
 

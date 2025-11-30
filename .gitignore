@@ -19,3 +19,6 @@ credentials.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Personal notes (not committed)
+IMPROVEMENTS.md
