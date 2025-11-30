@@ -9,7 +9,7 @@ import time
 import urllib.request
 import ssl
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, Union, Any
 
 from app.core import state
 from app.services.auth import get_gmail_service
@@ -17,7 +17,7 @@ from app.services.auth import get_gmail_service
 
 # ----- Filters -----
 
-def build_gmail_query(filters: Optional[dict] = None) -> str:
+def build_gmail_query(filters: Optional[Union[dict, Any]] = None) -> str:
     """Build Gmail search query from filter parameters.
     
     Args:
@@ -52,7 +52,7 @@ def build_gmail_query(filters: Optional[dict] = None) -> str:
 
 # ----- Email Parsing Helpers -----
 
-def _get_unsubscribe_from_headers(headers: list) -> tuple[str, str]:
+def _get_unsubscribe_from_headers(headers: list) -> tuple[Optional[str], Optional[str]]:
     """Extract unsubscribe link from email headers."""
     for header in headers:
         if header['name'].lower() == 'list-unsubscribe':
