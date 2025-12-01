@@ -18,10 +18,10 @@ from app.api import status_router, actions_router
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
     # Startup
-    print(f"🚀 {settings.app_name} v{settings.app_version} starting...")
+    print(f"{settings.app_name} v{settings.app_version} starting...")
     yield
     # Shutdown
-    print("👋 Shutting down...")
+    print("Shutting down...")
 
 
 def create_app() -> FastAPI:

@@ -4,10 +4,10 @@
 
 ## Type of Change
 
-- [ ] 🐛 Bug fix
-- [ ] ✨ New feature
-- [ ] 📚 Documentation
-- [ ] 🔧 Other
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation
+- [ ] Other
 
 ## Checklist
 

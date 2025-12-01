@@ -109,9 +109,9 @@ def get_gmail_service():
                     
                     with open(settings.token_file, 'w') as token:
                         token.write(new_creds.to_json())
-                    print("✅ OAuth complete! Token saved.")
+                    print("OAuth complete! Token saved.")
                 except Exception as e:
-                    print(f"❌ OAuth error: {e}")
+                    print(f"OAuth error: {e}")
                 finally:
                     _auth_in_progress["active"] = False
                     state.pending_auth_url["url"] = None
@@ -145,7 +145,7 @@ def sign_out() -> dict:
     state.reset_delete_scan()
     state.reset_mark_read()
     
-    print("🚪 Signed out - results cleared")
+    print("Signed out - results cleared")
     return {"success": True, "message": "Signed out successfully", "results_cleared": True}
 
 

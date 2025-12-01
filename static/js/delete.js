@@ -123,7 +123,7 @@ GmailCleaner.Delete = {
                 </div>
                 <div class="result-actions">
                     <button class="unsub-btn delete-btn" id="delete-${i}" onclick="GmailCleaner.Delete.deleteSenderEmails(${i})">
-                        🗑️ Delete ${r.count}
+                        Delete ${r.count}
                     </button>
                 </div>
             `;
@@ -168,12 +168,12 @@ GmailCleaner.Delete = {
                 btn.textContent = 'Error';
                 alert('Error: ' + result.error);
                 btn.disabled = false;
-                btn.textContent = `🗑️ Delete ${r.count}`;
+                btn.textContent = `Delete ${r.count}`;
             }
         } catch (error) {
             alert('Error: ' + error.message);
             btn.disabled = false;
-            btn.textContent = `🗑️ Delete ${r.count}`;
+            btn.textContent = `Delete ${r.count}`;
         }
     },
 
@@ -238,7 +238,7 @@ GmailCleaner.Delete = {
                     const btn = document.getElementById('delete-' + index);
                     if (btn) {
                         btn.disabled = false;
-                        btn.textContent = `🗑️ Delete ${r.count}`;
+                        btn.textContent = `Delete ${r.count}`;
                     }
                 });
             }
