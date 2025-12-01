@@ -26,6 +26,8 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 
 ![Gmail Cleaner Demo](demo.gif)
 
+📺 **[Watch Setup Video (demo.mp4)](demo.mp4)** - Step-by-step guide to create OAuth credentials
+
 *Filter by days/size-of-email/category → Scan senders → Select → Delete thousands of emails in seconds!*
 
 ## Setup
@@ -35,6 +37,8 @@ A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails 
 > Each user runs their own instance with their own credentials.
 
 ### 1. Get Google OAuth Credentials
+
+> 📺 **Video Tutorial**: [Watch demo.mp4](demo.mp4) for a visual walkthrough
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select existing)
