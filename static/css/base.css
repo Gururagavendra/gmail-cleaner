@@ -70,3 +70,100 @@ body {
 .spinner {
     animation: spin 1s linear infinite;
 }
+
+/* Deleting State - Blue to indicate in-progress */
+.btn-deleting {
+    background: #3b82f6 !important;
+    color: white !important;
+    cursor: wait !important;
+    opacity: 1 !important;
+}
+
+.btn-deleting:hover {
+    background: #2563eb !important;
+}
+
+/* Bulk Delete Overlay */
+.delete-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(59, 130, 246, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(2px);
+}
+
+.delete-overlay-content {
+    background: var(--card-bg);
+    padding: 32px 48px;
+    border-radius: var(--radius-md);
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    border: 2px solid #3b82f6;
+    min-width: 320px;
+}
+
+.delete-overlay-spinner {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+}
+
+.delete-overlay h3 {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.delete-overlay p {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.delete-progress-container {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 16px 0;
+}
+
+.delete-progress-bar {
+    height: 100%;
+    background: #3b82f6;
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.delete-stats {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+}
+
+/* Info Note */
+.info-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #1e40af;
+}
+
+.info-note svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: #3b82f6;
+}

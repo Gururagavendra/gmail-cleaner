@@ -631,3 +631,97 @@ def delete_emails_bulk(senders: list[str]) -> dict:
     if total_deleted == 0:
         return {"success": False, "deleted": 0, "message": "No emails found to delete"}
     return {"success": True, "deleted": total_deleted, "message": f"Deleted {total_deleted} emails"}
+
+
+def delete_emails_bulk_background(senders: list[str]) -> None:
+    """Delete emails from multiple senders with progress updates (background task).
+    
+    Optimized to collect all message IDs first, then batch delete in larger chunks.
+    """
+    from app.core import state
+    
+    state.reset_delete_bulk()
+    
+    if not senders:
+        state.delete_bulk_status["done"] = True
+        state.delete_bulk_status["error"] = "No senders specified"
+        return
+    
+    total_senders = len(senders)
+    state.delete_bulk_status["total_senders"] = total_senders
+    state.delete_bulk_status["message"] = "Collecting emails to delete..."
+    
+    service, error = get_gmail_service()
+    if error:
+        state.delete_bulk_status["done"] = True
+        state.delete_bulk_status["error"] = error
+        return
+    
+    # Phase 1: Collect all message IDs from all senders
+    all_message_ids = []
+    errors = []
+    
+    for i, sender in enumerate(senders):
+        state.delete_bulk_status["current_sender"] = i + 1
+        state.delete_bulk_status["progress"] = int((i / total_senders) * 40)  # 0-40% for collecting
+        state.delete_bulk_status["message"] = f"Finding emails from {sender}..."
+        
+        try:
+            query = f'from:{sender}'
+            results = service.users().messages().list(userId='me', q=query, maxResults=500).execute()
+            messages = results.get('messages', [])
+            
+            while 'nextPageToken' in results:
+                results = service.users().messages().list(
+                    userId='me', q=query, maxResults=500, pageToken=results['nextPageToken']
+                ).execute()
+                messages.extend(results.get('messages', []))
+            
+            all_message_ids.extend([msg['id'] for msg in messages])
+        except Exception as e:
+            errors.append(f"{sender}: {str(e)}")
+    
+    if not all_message_ids:
+        state.delete_bulk_status["progress"] = 100
+        state.delete_bulk_status["done"] = True
+        state.delete_bulk_status["message"] = "No emails found to delete"
+        return
+    
+    # Phase 2: Batch delete all collected IDs (larger batches = fewer API calls)
+    total_emails = len(all_message_ids)
+    state.delete_bulk_status["message"] = f"Deleting {total_emails} emails..."
+    
+    batch_size = 1000  # Gmail allows up to 1000 per batchModify
+    deleted = 0
+    
+    try:
+        for i in range(0, total_emails, batch_size):
+            batch = all_message_ids[i:i + batch_size]
+            service.users().messages().batchModify(
+                userId='me',
+                body={'ids': batch, 'addLabelIds': ['TRASH']}
+            ).execute()
+            deleted += len(batch)
+            state.delete_bulk_status["deleted_count"] = deleted
+            # Progress: 40-100% for deleting
+            state.delete_bulk_status["progress"] = 40 + int((deleted / total_emails) * 60)
+            state.delete_bulk_status["message"] = f"Deleted {deleted}/{total_emails} emails..."
+    except Exception as e:
+        errors.append(f"Batch delete error: {str(e)}")
+    
+    # Done
+    state.delete_bulk_status["progress"] = 100
+    state.delete_bulk_status["done"] = True
+    state.delete_bulk_status["deleted_count"] = deleted
+    
+    if errors:
+        state.delete_bulk_status["error"] = f"Some errors: {'; '.join(errors[:3])}"
+        state.delete_bulk_status["message"] = f"Deleted {deleted} emails with some errors"
+    else:
+        state.delete_bulk_status["message"] = f"Successfully deleted {deleted} emails"
+
+
+def get_delete_bulk_status() -> dict:
+    """Get delete bulk operation status."""
+    from app.core import state
+    return state.delete_bulk_status

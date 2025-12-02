@@ -194,7 +194,7 @@ GmailCleaner.Scanner = {
         window.open(r.link, '_blank');
         btn.textContent = 'Opened ↗';
         btn.classList.add('success');
-        btn.disabled = true;
+        // Keep button clickable so user can re-open if needed
     },
 
     toggleSelectAll() {

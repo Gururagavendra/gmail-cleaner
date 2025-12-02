@@ -154,7 +154,13 @@ GmailCleaner.Delete = {
         }
         
         btn.disabled = true;
-        btn.textContent = 'Deleting...';
+        btn.classList.add('btn-deleting');
+        btn.innerHTML = `
+            <svg class="spinner" viewBox="0 0 24 24" width="14" height="14">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60" stroke-linecap="round"/>
+            </svg>
+            Deleting...
+        `;
         
         try {
             const response = await fetch('/api/delete-emails', {
@@ -165,22 +171,25 @@ GmailCleaner.Delete = {
             const result = await response.json();
             
             if (result.success) {
-                btn.textContent = '✓ Deleted!';
+                btn.classList.remove('btn-deleting');
+                btn.innerHTML = '✓ Deleted!';
                 btn.classList.add('success');
                 setTimeout(() => {
                     GmailCleaner.deleteResults = GmailCleaner.deleteResults.filter((_, i) => i !== index);
                     this.displayResults();
                 }, 1000);
             } else {
-                btn.textContent = 'Error';
+                btn.classList.remove('btn-deleting');
+                btn.innerHTML = 'Error';
                 alert('Error: ' + result.message);
                 btn.disabled = false;
-                btn.textContent = `Delete ${r.count}`;
+                btn.innerHTML = `Delete ${r.count}`;
             }
         } catch (error) {
             alert('Error: ' + error.message);
+            btn.classList.remove('btn-deleting');
             btn.disabled = false;
-            btn.textContent = `Delete ${r.count}`;
+            btn.innerHTML = `Delete ${r.count}`;
         }
     },
 
@@ -204,63 +213,141 @@ GmailCleaner.Delete = {
             return;
         }
         
+        // Show bulk delete overlay with progress bar
+        this.showDeleteOverlay(checkboxes.length, totalEmails);
+        
         checkboxes.forEach(cb => {
             const index = parseInt(cb.dataset.index);
             const btn = document.getElementById('delete-' + index);
             if (btn) {
                 btn.disabled = true;
-                btn.textContent = 'Deleting...';
+                btn.classList.add('btn-deleting');
+                btn.innerHTML = `
+                    <svg class="spinner" viewBox="0 0 24 24" width="14" height="14">
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60" stroke-linecap="round"/>
+                    </svg>
+                    Deleting...
+                `;
             }
         });
         
         try {
-            const response = await fetch('/api/delete-emails-bulk', {
+            // Start the background task
+            await fetch('/api/delete-emails-bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders: senderEmails })
             });
-            const result = await response.json();
             
-            if (result.success) {
-                checkboxes.forEach(cb => {
-                    const index = parseInt(cb.dataset.index);
-                    const btn = document.getElementById('delete-' + index);
-                    if (btn) {
-                        btn.textContent = '✓ Deleted!';
-                        btn.classList.add('success');
-                    }
-                });
+            // Poll for progress
+            this.pollDeleteProgress(checkboxes);
+        } catch (error) {
+            this.hideDeleteOverlay();
+            alert('Error: ' + error.message);
+        }
+    },
+
+    async pollDeleteProgress(checkboxes) {
+        try {
+            const response = await fetch('/api/delete-bulk-status');
+            const status = await response.json();
+            
+            // Update progress bar in overlay
+            this.updateDeleteOverlay(status);
+            
+            if (status.done) {
+                this.hideDeleteOverlay();
                 
-                setTimeout(async () => {
-                    const resultsResponse = await fetch('/api/delete-scan-results');
-                    GmailCleaner.deleteResults = await resultsResponse.json();
-                    this.displayResults();
-                    document.getElementById('deleteSelectAll').checked = false;
-                }, 800);
+                if (!status.error) {
+                    checkboxes.forEach(cb => {
+                        const index = parseInt(cb.dataset.index);
+                        const btn = document.getElementById('delete-' + index);
+                        if (btn) {
+                            btn.classList.remove('btn-deleting');
+                            btn.innerHTML = '✓ Deleted!';
+                            btn.classList.add('success');
+                        }
+                    });
+                    
+                    setTimeout(async () => {
+                        const resultsResponse = await fetch('/api/delete-scan-results');
+                        GmailCleaner.deleteResults = await resultsResponse.json();
+                        this.displayResults();
+                        document.getElementById('deleteSelectAll').checked = false;
+                    }, 800);
+                } else {
+                    alert('Error: ' + status.error);
+                    checkboxes.forEach(cb => {
+                        const index = parseInt(cb.dataset.index);
+                        const r = GmailCleaner.deleteResults[index];
+                        const btn = document.getElementById('delete-' + index);
+                        if (btn) {
+                            btn.classList.remove('btn-deleting');
+                            btn.disabled = false;
+                            btn.innerHTML = `Delete ${r.count}`;
+                        }
+                    });
+                }
             } else {
-                alert('Error: ' + result.message);
-                checkboxes.forEach(cb => {
-                    const index = parseInt(cb.dataset.index);
-                    const r = GmailCleaner.deleteResults[index];
-                    const btn = document.getElementById('delete-' + index);
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.textContent = `Delete ${r.count}`;
-                    }
-                });
+                setTimeout(() => this.pollDeleteProgress(checkboxes), 300);
             }
         } catch (error) {
-            alert('Error: ' + error.message);
-            // Reset buttons after network error
-            document.querySelectorAll('.delete-cb:checked').forEach(cb => {
-                const index = parseInt(cb.dataset.index);
-                const r = GmailCleaner.deleteResults[index];
-                const btn = document.getElementById('delete-' + index);
-                if (btn && r) {
-                    btn.disabled = false;
-                    btn.textContent = `Delete ${r.count}`;
-                }
-            });
+            setTimeout(() => this.pollDeleteProgress(checkboxes), 500);
+        }
+    },
+
+    showDeleteOverlay(senderCount, emailCount) {
+        // Remove any existing overlay
+        this.hideDeleteOverlay();
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'deleteOverlay';
+        overlay.className = 'delete-overlay';
+        overlay.innerHTML = `
+            <div class="delete-overlay-content">
+                <svg class="delete-overlay-spinner spinner" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="60" stroke-linecap="round"/>
+                </svg>
+                <h3>Deleting Emails...</h3>
+                <div class="delete-progress-container">
+                    <div class="delete-progress-bar" id="deleteBulkProgressBar"></div>
+                </div>
+                <p id="deleteBulkProgressText">Starting deletion...</p>
+                <p class="delete-stats" id="deleteBulkStats">0/${senderCount} senders | 0 emails deleted</p>
+            </div>
+        `;
+        overlay.dataset.totalSenders = senderCount;
+        document.body.appendChild(overlay);
+    },
+
+    updateDeleteOverlay(status) {
+        const progressBar = document.getElementById('deleteBulkProgressBar');
+        const progressText = document.getElementById('deleteBulkProgressText');
+        const stats = document.getElementById('deleteBulkStats');
+        const overlay = document.getElementById('deleteOverlay');
+        
+        if (progressBar) {
+            progressBar.style.width = status.progress + '%';
+        }
+        if (progressText) {
+            progressText.textContent = status.message;
+        }
+        if (stats && overlay) {
+            const totalSenders = overlay.dataset.totalSenders || status.total_senders;
+            if (status.progress <= 40) {
+                // Phase 1: Collecting emails
+                stats.textContent = `Scanning ${status.current_sender || 0}/${totalSenders} senders...`;
+            } else {
+                // Phase 2: Deleting
+                stats.textContent = `${status.deleted_count || 0} emails deleted`;
+            }
+        }
+    },
+
+    hideDeleteOverlay() {
+        const overlay = document.getElementById('deleteOverlay');
+        if (overlay) {
+            overlay.remove();
         }
     }
 };

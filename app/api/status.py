@@ -15,6 +15,7 @@ from app.services import (
     get_mark_read_status,
     get_delete_scan_status,
     get_delete_scan_results,
+    get_delete_bulk_status,
 )
 
 router = APIRouter(prefix="/api", tags=["Status"])
@@ -66,3 +67,9 @@ async def api_delete_scan_status():
 async def api_delete_scan_results():
     """Get delete scan results (senders grouped by count)."""
     return get_delete_scan_results()
+
+
+@router.get("/delete-bulk-status")
+async def api_delete_bulk_status():
+    """Get bulk delete operation status."""
+    return get_delete_bulk_status()

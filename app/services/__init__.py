@@ -32,4 +32,6 @@ from .gmail import (
     get_delete_scan_results,
     delete_emails_by_sender,
     delete_emails_bulk,
+    delete_emails_bulk_background,
+    get_delete_bulk_status,
 )
