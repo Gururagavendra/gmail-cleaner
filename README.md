@@ -71,11 +71,21 @@ Lets make this tool a better one by improving as much as possible, All features 
 6. Go to **Audience** (left sidebar) → Scroll to **Test users**
    - Click **Add Users** → Add your Gmail address → **Save**
 7. Go to **Clients** (left sidebar) → **Create Client**
-   - Application type: **Desktop app**
+   - Choose the application type based on your setup:
+   
+   | Setup | Application Type | Redirect URI |
+   |-------|------------------|--------------|
+   | **Local/Desktop** (Python with browser) | Desktop app | Not needed |
+   | **Docker/Remote Server** | Web application | `http://YOUR_HOST:8767/` |
+   
    - Name: "Gmail Cleanup" (or anything)
    - Click **Create**
    - Click **Download** (downloads JSON file)
    - Rename the downloaded file to `credentials.json`
+
+> **💡 Which should I choose?**
+> - Running locally with Python (`uv run python main.py`)? → **Desktop app**
+> - Running with Docker or on a remote server? → **Web application**
 
 ### 2. Clone the Repository
 
@@ -205,25 +215,21 @@ If you see `OAuth error: (mismatching_state) CSRF Warning`:
 
 ### Custom Domain / Reverse Proxy / Remote Server
 
-If you're accessing the app via a **custom domain** (e.g., `gmail.example.com`) or a **server IP** instead of `localhost`, you need to configure the OAuth redirect host:
+If you're accessing the app via a **custom domain** (e.g., `gmail.example.com`) or a **server IP** instead of `localhost`:
 
-1. **Set the `OAUTH_HOST` environment variable** to your domain or IP:
+> **Important**: You must use **Web application** credentials (not Desktop app) for remote server setups. See [Step 7 in Get Google OAuth Credentials](#1-get-google-oauth-credentials).
+
+1. **Create Web application credentials** in Google Cloud Console:
+   - Go to **Clients** → **Create Client** → Select **Web application**
+   - Under **Authorized redirect URIs**, add: `http://YOUR_DOMAIN:8767/`
+   - Download and rename to `credentials.json`
+
+2. **Set the environment variables** in docker-compose.yml:
    ```yaml
-   # docker-compose.yml
    environment:
      - WEB_AUTH=true
      - OAUTH_HOST=gmail.example.com  # Your custom domain or server IP
    ```
-
-2. **Update Google Cloud Console** with the correct redirect URI:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/) → Your Project
-   - Go to **APIs & Services** → **Credentials**
-   - Click on your OAuth 2.0 Client ID
-   - Under **Authorized redirect URIs**, add:
-     ```
-     http://gmail.example.com:8767/
-     ```
-     (Replace with your domain/IP and ensure port 8767 is accessible)
 
 3. **For HTTPS with reverse proxy**, make sure your proxy forwards port 8767 for the OAuth callback, or use the same port as your main app and configure accordingly.
 
