@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="/static/css/filters.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
+    <!-- Litepicker Date Range Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker@latest/dist/litepicker.css">
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -100,7 +102,14 @@
                                 <option value="90d">90 days</option>
                                 <option value="180d">6 months</option>
                                 <option value="365d">1 year</option>
+                                <option value="custom">Custom date range</option>
                             </select>
+                        </div>
+                        <!-- Custom Date Range Picker (Hidden by default) -->
+                        <div class="filter-group date-range-group hidden" id="dateRangeGroup">
+                            <label for="dateRangePicker">Select date range</label>
+                            <input type="text" id="dateRangePicker" class="date-range-input" placeholder="YYYY-MM-DD - YYYY-MM-DD">
+                            <div id="datePickerContainer" class="date-picker-container"></div>
                         </div>
                         <div class="filter-group">
                             <label for="filterLargerThan">Larger than</label>
@@ -122,6 +131,10 @@
                                 <option value="forums">Forums</option>
                                 <option value="primary">Primary</option>
                             </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterSender">From Sender</label>
+                            <input type="text" id="filterSender" class="filter-input" placeholder="email@domain.com or domain.com">
                         </div>
                         <button class="filter-clear-btn" id="filterClearBtn" title="Clear all filters">
                             <svg viewBox="0 0 24 24" width="16" height="16">
@@ -412,5 +425,7 @@
     <script src="/static/js/scanner.js"></script>
     <script src="/static/js/markread.js"></script>
     <script src="/static/js/delete.js"></script>
+    <!-- Litepicker Date Range Picker Library -->
+    <script src="https://cdn.jsdelivr.net/npm/litepicker@latest/dist/litepicker.js"></script>
 </body>
 </html>

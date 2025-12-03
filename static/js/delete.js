@@ -5,6 +5,42 @@
 window.GmailCleaner = window.GmailCleaner || {};
 
 GmailCleaner.Delete = {
+    formatDateRange(firstDate, lastDate) {
+        /**
+         * Parse RFC 2822 date string and format as MM/DD/YYYY
+         * Example: "Wed, 15 Nov 2025 10:30:00 +0000" -> "11/15/2025"
+         * Returns date range from oldest to newest
+         */
+        const formatDate = (dateStr) => {
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return null;
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                const y = date.getFullYear();
+                return `${m}/${d}/${y}`;
+            } catch {
+                return null;
+            }
+        };
+        
+        const first = formatDate(firstDate);
+        const last = formatDate(lastDate);
+        
+        if (!first || !last) return '';
+        if (first === last) return first;
+        
+        // Compare dates to determine order (oldest to newest)
+        const firstDateObj = new Date(firstDate);
+        const lastDateObj = new Date(lastDate);
+        
+        if (firstDateObj <= lastDateObj) {
+            return `${first} to ${last}`;
+        } else {
+            return `${last} to ${first}`;
+        }
+    },
+
     async startScan() {
         if (GmailCleaner.deleteScanning) return;
         
@@ -118,6 +154,9 @@ GmailCleaner.Delete = {
             const item = document.createElement('div');
             item.className = 'result-item';
             
+            const dateRange = this.formatDateRange(r.first_date, r.last_date);
+            const dateRangeDisplay = dateRange ? `<div class="result-date-range">${dateRange}</div>` : '';
+            
             item.innerHTML = `
                 <label class="checkbox-wrapper result-checkbox">
                     <input type="checkbox" class="delete-cb" data-index="${i}" data-email="${GmailCleaner.UI.escapeHtml(r.email)}">
@@ -126,7 +165,10 @@ GmailCleaner.Delete = {
                 <div class="result-content">
                     <div class="result-sender">${GmailCleaner.UI.escapeHtml(r.email)}</div>
                     <div class="result-subject">${GmailCleaner.UI.escapeHtml(r.subjects[0] || 'No subject')}</div>
-                    <span class="result-count">${r.count} emails</span>
+                    <div class="result-meta">
+                        ${dateRangeDisplay}
+                        <span class="result-count">${r.count} emails</span>
+                    </div>
                 </div>
                 <div class="result-actions">
                     <button class="unsub-btn delete-btn" id="delete-${i}" onclick="GmailCleaner.Delete.deleteSenderEmails(${i})">

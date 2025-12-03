@@ -14,8 +14,11 @@ import re
 class FiltersModel(BaseModel):
     """Gmail filter options with validation."""
     older_than: Optional[str] = Field(default=None, description="Filter emails older than (e.g., 7d, 30d, 90d, 180d, 365d)")
+    after_date: Optional[str] = Field(default=None, description="Filter emails after this date (format: YYYY/MM/DD)")
+    before_date: Optional[str] = Field(default=None, description="Filter emails before this date (format: YYYY/MM/DD)")
     larger_than: Optional[str] = Field(default=None, description="Filter emails larger than (e.g., 1M, 5M, 10M)")
     category: Optional[str] = Field(default=None, description="Gmail category filter")
+    sender: Optional[str] = Field(default=None, description="Filter emails from specific sender (email address or domain)")
     
     @field_validator('older_than')
     @classmethod
@@ -24,6 +27,24 @@ class FiltersModel(BaseModel):
             return None
         if not re.match(r'^\d+d$', v):
             raise ValueError('older_than must be in format like "7d", "30d", "365d"')
+        return v
+    
+    @field_validator('after_date')
+    @classmethod
+    def validate_after_date(cls, v):
+        if v is None or v == '':
+            return None
+        if not re.match(r'^\d{4}/\d{2}/\d{2}$', v):
+            raise ValueError('after_date must be in format like "2025/01/15"')
+        return v
+    
+    @field_validator('before_date')
+    @classmethod
+    def validate_before_date(cls, v):
+        if v is None or v == '':
+            return None
+        if not re.match(r'^\d{4}/\d{2}/\d{2}$', v):
+            raise ValueError('before_date must be in format like "2025/01/15"')
         return v
     
     @field_validator('larger_than')
@@ -44,6 +65,20 @@ class FiltersModel(BaseModel):
         if v.lower() not in allowed:
             raise ValueError(f'category must be one of: {allowed}')
         return v.lower()
+    
+    @field_validator('sender')
+    @classmethod
+    def validate_sender(cls, v):
+        if v is None or v == '':
+            return None
+        # Allow email addresses or domain names
+        sender = v.strip()
+        if not sender:
+            return None
+        # Basic validation: must contain @ or be a domain-like string
+        if '@' not in sender and '.' not in sender:
+            raise ValueError('sender must be a valid email address or domain')
+        return sender
 
 
 # ----- Request Models -----

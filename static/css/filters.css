@@ -58,6 +58,118 @@
     border-color: var(--primary-color);
 }
 
+.filter-input {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    font-size: 13px;
+    color: var(--text-primary);
+    min-width: 150px;
+}
+
+.filter-input:hover {
+    border-color: var(--text-muted);
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.filter-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Date Range Picker Styles */
+.date-range-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.date-range-group.hidden {
+    display: none !important;
+}
+
+.date-range-input {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    min-width: 200px;
+}
+
+.date-range-input:hover {
+    border-color: var(--text-muted);
+}
+
+.date-range-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Litepicker Calendar Overrides */
+.litepicker {
+    font-family: inherit;
+}
+
+.litepicker.show-tooltip .preview-range {
+    color: var(--text-primary);
+}
+
+.litepicker .container {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.litepicker .calendar-sheet {
+    background: var(--card-bg);
+}
+
+.litepicker .calendar-header {
+    background: var(--card-bg);
+    color: var(--text-primary);
+}
+
+.litepicker .calendar-day {
+    color: var(--text-primary);
+}
+
+.litepicker .calendar-day.is-disabled {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.litepicker .calendar-day.is-today {
+    border: 1px solid var(--primary-color);
+}
+
+.litepicker .calendar-day.is-highlight {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.litepicker .calendar-day.is-in-range {
+    background: rgba(66, 133, 244, 0.2);
+    color: var(--text-primary);
+}
+
+.litepicker .calendar-day.is-start-date,
+.litepicker .calendar-day.is-end-date {
+    background: var(--primary-color);
+    color: white;
+}
+
+.litepicker .calendar-day.is-start-date.is-end-date {
+    background: var(--primary-color);
+}
+
 .filter-clear-btn {
     display: flex;
     align-items: center;

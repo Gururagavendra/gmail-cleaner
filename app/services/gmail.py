@@ -60,9 +60,12 @@ def build_gmail_query(filters: Optional[Union[dict, Any]] = None) -> str:
     
     Args:
         filters: dict with keys:
-            - older_than: '7d', '30d', '90d', '180d', '365d' or empty
+            - older_than: '7d', '30d', '90d', '180d', '365d' or empty (for relative dates)
+            - after_date: 'YYYY/MM/DD' for emails after this date
+            - before_date: 'YYYY/MM/DD' for emails before this date
             - larger_than: '1M', '5M', '10M', '25M' or empty
             - category: 'promotions', 'social', 'updates', 'forums', 'primary' or empty
+            - sender: 'email@domain.com' or 'domain.com' to filter by sender
     
     Returns:
         Gmail query string, empty string if no filters
@@ -76,14 +79,26 @@ def build_gmail_query(filters: Optional[Union[dict, Any]] = None) -> str:
     
     query_parts = []
     
-    if older_than := filters.get('older_than', ''):
-        query_parts.append(f'older_than:{older_than}')
+    # Use after/before dates if provided (custom date range)
+    if after_date := filters.get('after_date', ''):
+        query_parts.append(f'after:{after_date}')
+    
+    if before_date := filters.get('before_date', ''):
+        query_parts.append(f'before:{before_date}')
+    
+    # Fall back to older_than for preset options
+    if not after_date and not before_date:
+        if older_than := filters.get('older_than', ''):
+            query_parts.append(f'older_than:{older_than}')
     
     if larger_than := filters.get('larger_than', ''):
         query_parts.append(f'larger:{larger_than}')
     
     if category := filters.get('category', ''):
         query_parts.append(f'category:{category}')
+    
+    if sender := filters.get('sender', ''):
+        query_parts.append(f'from:{sender}')
     
     return ' '.join(query_parts)
 
@@ -191,7 +206,7 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
         
         # Process in batches using Gmail Batch API (100 requests per HTTP call!)
         unsubscribe_data: dict[str, dict] = defaultdict(lambda: {
-            "link": None, "count": 0, "subjects": [], "type": None, "sender": "", "email": ""
+            "link": None, "count": 0, "subjects": [], "type": None, "sender": "", "email": "", "first_date": None, "last_date": None
         })
         processed = 0
         batch_size = 100
@@ -211,6 +226,13 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                 subject = _get_subject(headers)
                 domain = sender_email.split('@')[-1] if '@' in sender_email else sender_email
                 
+                # Extract date from headers
+                email_date = None
+                for header in headers:
+                    if header['name'].lower() == 'date':
+                        email_date = header['value']
+                        break
+                
                 unsubscribe_data[domain]["link"] = unsub_link
                 unsubscribe_data[domain]["count"] += 1
                 unsubscribe_data[domain]["type"] = unsub_type
@@ -218,6 +240,12 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                 unsubscribe_data[domain]["email"] = sender_email
                 if len(unsubscribe_data[domain]["subjects"]) < 3:
                     unsubscribe_data[domain]["subjects"].append(subject)
+                
+                # Track first and last dates
+                if email_date:
+                    if unsubscribe_data[domain]["first_date"] is None:
+                        unsubscribe_data[domain]["first_date"] = email_date
+                    unsubscribe_data[domain]["last_date"] = email_date
         
         # Execute batch requests
         for i in range(0, len(message_ids), batch_size):
@@ -230,7 +258,7 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                         userId='me',
                         id=msg_id,
                         format='metadata',
-                        metadataHeaders=['From', 'Subject', 'List-Unsubscribe', 'List-Unsubscribe-Post']
+                        metadataHeaders=['From', 'Subject', 'Date', 'List-Unsubscribe', 'List-Unsubscribe-Post']
                     )
                 )
             
@@ -247,7 +275,8 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
         # Sort by count and format results
         sorted_results = sorted(
             [{"domain": k, "link": v["link"], "count": v["count"], "subjects": v["subjects"], 
-              "type": v["type"], "sender": v.get("sender", ""), "email": v.get("email", "")} 
+              "type": v["type"], "sender": v.get("sender", ""), "email": v.get("email", ""), 
+              "first_date": v.get("first_date"), "last_date": v.get("last_date")} 
              for k, v in unsubscribe_data.items()],
             key=lambda x: x["count"],
             reverse=True
@@ -483,7 +512,7 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
         state.delete_scan_status["message"] = f"Scanning {total} emails..."
         
         # Group by sender using Gmail Batch API
-        sender_counts: dict[str, dict] = defaultdict(lambda: {"count": 0, "sender": "", "email": "", "subjects": [], "message_ids": [], "total_size": 0})
+        sender_counts: dict[str, dict] = defaultdict(lambda: {"count": 0, "sender": "", "email": "", "subjects": [], "first_date": None, "last_date": None, "message_ids": [], "total_size": 0})
         processed = 0
         batch_size = 100
         
@@ -499,6 +528,14 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
             subject = _get_subject(headers)
             msg_id = response.get('id', '')
             size_estimate = response.get('sizeEstimate', 0)
+            
+            # Extract date from headers
+            email_date = None
+            for header in headers:
+                if header['name'].lower() == 'date':
+                    email_date = header['value']
+                    break
+            
             if sender_email:
                 sender_counts[sender_email]["count"] += 1
                 sender_counts[sender_email]["sender"] = sender_name
@@ -507,6 +544,12 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
                 sender_counts[sender_email]["total_size"] += size_estimate
                 if len(sender_counts[sender_email]["subjects"]) < 3:
                     sender_counts[sender_email]["subjects"].append(subject)
+                
+                # Track first and last dates
+                if email_date:
+                    if sender_counts[sender_email]["first_date"] is None:
+                        sender_counts[sender_email]["first_date"] = email_date
+                    sender_counts[sender_email]["last_date"] = email_date
         
         # Execute batch requests
         for i in range(0, len(messages), batch_size):
@@ -519,7 +562,7 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
                         userId='me',
                         id=msg_data['id'],
                         format='metadata',
-                        metadataHeaders=['From', 'Subject']
+                        metadataHeaders=['From', 'Subject', 'Date']
                     )
                 )
             
