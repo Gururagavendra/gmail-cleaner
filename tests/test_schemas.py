@@ -165,6 +165,11 @@ class TestMarkReadRequest:
         assert request.count == 100
         assert request.filters is None
 
+    def test_count_none_means_all(self):
+        """Count of None should be valid (means 'all')."""
+        request = MarkReadRequest(count=None)
+        assert request.count is None
+
     def test_count_maximum(self):
         """Maximum count should be 100000."""
         request = MarkReadRequest(count=100000)

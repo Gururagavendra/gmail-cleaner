@@ -391,8 +391,13 @@ def get_unread_count() -> dict:
         return {"count": 0, "error": str(e)}
 
 
-def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
-    """Mark unread emails as read."""
+def mark_emails_as_read(count: Optional[int] = 100, filters: Optional[dict] = None):
+    """Mark unread emails as read.
+    
+    Args:
+        count: Number of emails to mark. None means mark ALL unread emails.
+        filters: Optional Gmail filter options.
+    """
     state.reset_mark_read()
     state.mark_read_status["message"] = "Connecting to Gmail..."
     
@@ -410,26 +415,32 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
         if filter_query := build_gmail_query(filters):
             query = f'{query} {filter_query}'
         
+        # count=None means "all" - use a large limit
+        mark_all = count is None
+        fetch_limit = 100000 if mark_all else count
+        
         # Fetch unread messages
         results = service.users().messages().list(
             userId='me',
             q=query,
-            maxResults=min(count, 500)
+            maxResults=min(fetch_limit, 500)
         ).execute()
         
         messages = results.get('messages', [])
         
-        # Pagination
-        while 'nextPageToken' in results and len(messages) < count:
+        # Pagination - fetch all if mark_all is True
+        while 'nextPageToken' in results and (mark_all or len(messages) < fetch_limit):
             results = service.users().messages().list(
                 userId='me',
                 q=query,
-                maxResults=min(count - len(messages), 500),
+                maxResults=500,
                 pageToken=results['nextPageToken']
             ).execute()
             messages.extend(results.get('messages', []))
         
-        messages = messages[:count]
+        # Only limit if not marking all
+        if not mark_all:
+            messages = messages[:count]
         total = len(messages)
         
         if total == 0:

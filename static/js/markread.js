@@ -28,15 +28,8 @@ GmailCleaner.MarkRead = {
         const progressCard = document.getElementById('markReadProgressCard');
         const countSelect = document.getElementById('markReadCount');
         
-        let count = countSelect.value;
-        if (count === 'all') {
-            // Get actual unread count from the displayed value
-            const countEl = document.querySelector('#unreadCount .count-number');
-            const unreadCount = parseInt(countEl.textContent.replace(/,/g, '')) || 10000;
-            count = unreadCount;
-        } else {
-            count = parseInt(count);
-        }
+        // null means "all" - backend will fetch all unread emails
+        const count = countSelect.value === 'all' ? null : parseInt(countSelect.value);
         
         const filters = GmailCleaner.Filters.get();
         
@@ -50,7 +43,7 @@ GmailCleaner.MarkRead = {
         progressCard.classList.remove('hidden');
         
         try {
-            await fetch('/api/mark-read', {
+            const response = await fetch('/api/mark-read', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -58,6 +51,12 @@ GmailCleaner.MarkRead = {
                     filters: filters
                 })
             });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Request failed: ${response.status}`);
+            }
+            
             this.pollProgress();
         } catch (error) {
             GmailCleaner.UI.showErrorToast('Error: ' + error.message);

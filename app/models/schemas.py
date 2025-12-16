@@ -92,7 +92,7 @@ class ScanRequest(BaseModel):
 
 class MarkReadRequest(BaseModel):
     """Request to mark emails as read."""
-    count: int = Field(default=100, ge=1, le=100000, description="Number of emails to mark")
+    count: Optional[int] = Field(default=100, ge=1, le=100000, description="Number of emails to mark (null = all)")
     filters: Optional[FiltersModel] = Field(default=None, description="Gmail filter options")
 
 
