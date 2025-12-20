@@ -1,0 +1,117 @@
+name: Update Changelog on Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Update CHANGELOG.md
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_DATE: ${{ github.event.release.published_at }}
+        run: |
+          python << 'PYTHON_SCRIPT'
+          import re
+          import os
+          from datetime import datetime
+
+          # Parse release date
+          release_date = os.environ.get('RELEASE_DATE', '')
+          if release_date:
+              # Parse ISO format and convert to YYYY-MM-DD
+              dt = datetime.fromisoformat(release_date.replace('Z', '+00:00'))
+              formatted_date = dt.strftime('%Y-%m-%d')
+          else:
+              formatted_date = datetime.now().strftime('%Y-%m-%d')
+
+          tag = os.environ.get('RELEASE_TAG', '')
+          name = os.environ.get('RELEASE_NAME', '')
+          body = os.environ.get('RELEASE_BODY', '')
+
+          # Read current CHANGELOG.md
+          with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+              changelog = f.read()
+
+          # Extract version from tag (remove 'v' prefix if present)
+          version = tag.lstrip('v')
+
+          # Format release notes
+          # If body is empty or just whitespace, use a default message
+          if not body or not body.strip():
+              release_notes = "### Added\n- Release " + tag + "\n"
+          else:
+              # Clean up the release body and format it
+              release_notes = body.strip()
+              # Ensure it starts with proper markdown formatting
+              if not release_notes.startswith('#'):
+                  release_notes = "### Added\n" + release_notes
+
+          # Create new version section
+          new_section = "## [" + version + "] - " + formatted_date + "\n\n" + release_notes + "\n\n"
+
+          # Find the [Unreleased] section and replace it
+          # Pattern: ## [Unreleased] followed by content until next ##
+          pattern = r'(## \[Unreleased\].*?)(?=\n## \[|\Z)'
+
+          def replace_unreleased(match):
+              unreleased_content = match.group(1)
+              # Add the new release section after Unreleased
+              return unreleased_content + '\n' + new_section
+
+          updated_changelog = re.sub(pattern, replace_unreleased, changelog, flags=re.DOTALL)
+
+          # Update the [Unreleased] link to point to the new tag
+          old_unreleased_link = re.search(r'\[Unreleased\]: (.*?)\n', updated_changelog)
+          if old_unreleased_link:
+              old_link = old_unreleased_link.group(1)
+              # Extract the base URL and create new links
+              base_url = old_link.split('/compare/')[0] if '/compare/' in old_link else 'https://github.com/Gururagavendra/gmail-cleaner'
+              new_unreleased_link = "[Unreleased]: " + base_url + "/compare/" + tag + "...HEAD\n"
+              new_version_link = "[" + version + "]: " + base_url + "/releases/tag/" + tag + "\n"
+
+              # Replace the old Unreleased link
+              updated_changelog = re.sub(
+                  r'\[Unreleased\]: .*?\n',
+                  new_unreleased_link,
+                  updated_changelog
+              )
+
+              # Add the new version link before the Unreleased link
+              updated_changelog = updated_changelog.replace(
+                  new_unreleased_link,
+                  new_version_link + new_unreleased_link
+              )
+
+          # Write updated CHANGELOG.md
+          with open('CHANGELOG.md', 'w', encoding='utf-8') as f:
+              f.write(updated_changelog)
+
+          print("✅ Updated CHANGELOG.md with release " + tag)
+          print("📅 Release date: " + formatted_date)
+          PYTHON_SCRIPT
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "docs: update CHANGELOG.md for release ${{ github.event.release.tag_name }}"
+          git push
