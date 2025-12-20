@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gmail Unsubscribe</title>
-    <!-- Modular CSS -->
-    <link rel="stylesheet" href="/static/css/base.css">
-    <link rel="stylesheet" href="/static/css/layout.css">
-    <link rel="stylesheet" href="/static/css/filters.css">
-    <link rel="stylesheet" href="/static/css/components.css">
-    <link rel="stylesheet" href="/static/css/responsive.css">
+    <!-- Modular CSS (cache-busted) -->
+    <link rel="stylesheet" href="/static/css/base.css?v={{ cache_bust }}">
+    <link rel="stylesheet" href="/static/css/layout.css?v={{ cache_bust }}">
+    <link rel="stylesheet" href="/static/css/filters.css?v={{ cache_bust }}">
+    <link rel="stylesheet" href="/static/css/components.css?v={{ cache_bust }}">
+    <link rel="stylesheet" href="/static/css/responsive.css?v={{ cache_bust }}">
     <!-- Litepicker Date Range Picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker@latest/dist/litepicker.css">
     <!-- Fonts -->
@@ -459,15 +459,15 @@
         </div>
     </div>
 
-    <!-- Modular JavaScript -->
-    <script src="/static/js/main.js"></script>
-    <script src="/static/js/ui.js"></script>
-    <script src="/static/js/auth.js"></script>
-    <script src="/static/js/filters.js"></script>
-    <script src="/static/js/scanner.js"></script>
-    <script src="/static/js/markread.js"></script>
-    <script src="/static/js/delete.js"></script>
-    <script src="/static/js/labels.js"></script>
+    <!-- Modular JavaScript (cache-busted) -->
+    <script src="/static/js/main.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/ui.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/auth.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/filters.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/scanner.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/markread.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/delete.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/labels.js?v={{ cache_bust }}"></script>
     <!-- Litepicker Date Range Picker Library -->
     <script src="https://cdn.jsdelivr.net/npm/litepicker@latest/dist/litepicker.js"></script>
 </body>

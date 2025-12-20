@@ -4,14 +4,20 @@ Gmail Cleaner - FastAPI Application
 Main application factory and configuration.
 """
 
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.templating import Jinja2Templates
 
 from app.core import settings
 from app.api import status_router, actions_router
+
+# Cache-busting: timestamp generated at app startup
+STARTUP_TIME = str(int(time.time()))
+
+templates = Jinja2Templates(directory="templates")
 
 
 @asynccontextmanager
@@ -45,14 +51,12 @@ def create_app() -> FastAPI:
 
     # HTML routes
     @app.get("/", include_in_schema=False)
-    async def root():
+    async def root(request: Request):
         """Serve the main HTML page."""
-        return FileResponse("templates/index.html", media_type="text/html")
-
-    @app.get("/index.html", include_in_schema=False)
-    async def index():
-        """Serve the main HTML page."""
-        return FileResponse("templates/index.html", media_type="text/html")
+        return templates.TemplateResponse(request, "index.html", {
+        "cache_bust": STARTUP_TIME,
+            "version": settings.app_version
+        })
 
     return app
 
