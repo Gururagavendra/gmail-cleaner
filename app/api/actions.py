@@ -4,8 +4,9 @@ Actions API Routes
 POST endpoints for triggering operations.
 """
 
+import logging
 from functools import partial
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
 from app.models import (
     ScanRequest,
@@ -40,6 +41,7 @@ from app.services import (
 )
 
 router = APIRouter(prefix="/api", tags=["Actions"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/scan")
@@ -59,13 +61,27 @@ async def api_sign_in(background_tasks: BackgroundTasks):
 @router.post("/sign-out")
 async def api_sign_out():
     """Sign out and clear credentials."""
-    return sign_out()
+    try:
+        return sign_out()
+    except Exception as e:
+        logger.error(f"Error during sign-out: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sign out",
+        )
 
 
 @router.post("/unsubscribe")
 async def api_unsubscribe(request: UnsubscribeRequest):
     """Unsubscribe from a single sender."""
-    return unsubscribe_single(request.domain, request.link)
+    try:
+        return unsubscribe_single(request.domain, request.link)
+    except Exception as e:
+        logger.error(f"Error during unsubscribe: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to unsubscribe",
+        )
 
 
 @router.post("/mark-read")
@@ -87,7 +103,19 @@ async def api_delete_scan(
 @router.post("/delete-emails")
 async def api_delete_emails(request: DeleteEmailsRequest):
     """Delete emails from a specific sender."""
-    return delete_emails_by_sender(request.sender)
+    if not request.sender or not request.sender.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sender email is required",
+        )
+    try:
+        return delete_emails_by_sender(request.sender)
+    except Exception as e:
+        logger.error(f"Error deleting emails: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete emails",
+        )
 
 
 @router.post("/delete-emails-bulk")
@@ -104,6 +132,7 @@ async def api_download_emails(
     request: DownloadEmailsRequest, background_tasks: BackgroundTasks
 ):
     """Start downloading email metadata for selected senders."""
+    # Note: Empty list is allowed - service function will handle it gracefully
     background_tasks.add_task(download_emails_background, request.senders)
     return {"status": "started"}
 
@@ -114,13 +143,32 @@ async def api_download_emails(
 @router.post("/labels")
 async def api_create_label(request: CreateLabelRequest):
     """Create a new Gmail label."""
-    return create_label(request.name)
+    try:
+        return create_label(request.name)
+    except Exception as e:
+        logger.error(f"Error creating label: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create label",
+        )
 
 
 @router.delete("/labels/{label_id}")
 async def api_delete_label(label_id: str):
     """Delete a Gmail label."""
-    return delete_label(label_id)
+    if not label_id or not label_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Label ID is required",
+        )
+    try:
+        return delete_label(label_id)
+    except Exception as e:
+        logger.error(f"Error deleting label: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete label",
+        )
 
 
 @router.post("/apply-label")
@@ -128,6 +176,16 @@ async def api_apply_label(
     request: ApplyLabelRequest, background_tasks: BackgroundTasks
 ):
     """Apply a label to emails from selected senders."""
+    if not request.label_id or not request.label_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Label ID is required",
+        )
+    if not request.senders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one sender is required",
+        )
     background_tasks.add_task(
         apply_label_to_senders_background, request.label_id, request.senders
     )
@@ -139,6 +197,16 @@ async def api_remove_label(
     request: RemoveLabelRequest, background_tasks: BackgroundTasks
 ):
     """Remove a label from emails from selected senders."""
+    if not request.label_id or not request.label_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Label ID is required",
+        )
+    if not request.senders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one sender is required",
+        )
     background_tasks.add_task(
         remove_label_from_senders_background, request.label_id, request.senders
     )
@@ -148,6 +216,11 @@ async def api_remove_label(
 @router.post("/archive")
 async def api_archive(request: ArchiveRequest, background_tasks: BackgroundTasks):
     """Archive emails from selected senders (remove from inbox)."""
+    if not request.senders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one sender is required",
+        )
     background_tasks.add_task(archive_emails_background, request.senders)
     return {"status": "started"}
 
@@ -157,6 +230,11 @@ async def api_mark_important(
     request: MarkImportantRequest, background_tasks: BackgroundTasks
 ):
     """Mark/unmark emails from selected senders as important."""
+    if not request.senders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one sender is required",
+        )
     background_tasks.add_task(
         partial(mark_important_background, request.senders, important=request.important)
     )
