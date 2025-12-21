@@ -287,6 +287,24 @@ def get_gmail_service():
                     # For local: bind to localhost for security
                     bind_address = "0.0.0.0" if is_web_auth_mode() else "localhost"  # nosec B104
 
+                    # Handle custom external port (e.g., Docker port mapping like 18767:8767)
+                    # The server listens on the internal port, but the redirect URI uses the external port
+                    redirect_port = (
+                        settings.oauth_external_port
+                        if settings.oauth_external_port is not None
+                        else settings.oauth_port
+                    )
+
+                    # If external port is different, set custom redirect URI
+                    if redirect_port != settings.oauth_port:
+                        # Construct redirect URI using external port
+                        redirect_uri = f"http://{settings.oauth_host}:{redirect_port}/"
+                        flow.redirect_uri = redirect_uri
+                        logger.info(
+                            f"Using custom redirect URI {redirect_uri} "
+                            f"(internal port: {settings.oauth_port}, external port: {redirect_port})"
+                        )
+
                     # Check if we should auto-open browser
                     # In Docker/web mode: don't open browser, print URL to logs
                     # On Windows/Mac/Linux desktop: auto-open browser
@@ -302,7 +320,7 @@ def get_gmail_service():
                         )
 
                     new_creds = flow.run_local_server(
-                        port=settings.oauth_port,
+                        port=settings.oauth_port,  # Server listens on internal port
                         bind_addr=bind_address,
                         host=settings.oauth_host,
                         open_browser=open_browser,

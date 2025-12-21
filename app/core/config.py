@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     debug: bool = False
     port: int = 8766
     oauth_port: int = 8767
+    oauth_external_port: int | None = Field(
+        default=None,
+        description="External port for OAuth redirect URI (when different from oauth_port, e.g., Docker port mapping)",
+    )
 
     # Auth
     web_auth: bool = Field(

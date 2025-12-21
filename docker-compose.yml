@@ -1,10 +1,12 @@
 services:
   gmail-cleaner:
     # Option 1: Multi-arch image: works natively on both AMD64 and ARM64 (Apple Silicon)
-    # image: ghcr.io/gururagavendra/gmail-cleaner:latest
+    image: ghcr.io/gururagavendra/gmail-cleaner:latest
+    pull_policy: always
 
     # Option 2: Build locally (uncomment below, comment out image above)
-    build: .
+    # build: .
+
     ports:
       - "8766:8766"  # Web UI
       - "8767:8767"  # OAuth callback
@@ -33,4 +35,8 @@ services:
 
       # Uncomment and set OAUTH_HOST if accessing via custom domain or server IP
       # - OAUTH_HOST=gmail.example.com
+
+      # Uncomment and set OAUTH_EXTERNAL_PORT if using custom port mapping
+      # (e.g., if you map ports like "18767:8767", set OAUTH_EXTERNAL_PORT=18767)
+      # - OAUTH_EXTERNAL_PORT=18767
     restart: unless-stopped

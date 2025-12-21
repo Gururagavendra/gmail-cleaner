@@ -79,7 +79,7 @@ Lets make this tool a better one by improving as much as possible, All features 
    | Setup | Application Type | Redirect URI |
    |-------|------------------|--------------|
    | **Local/Desktop** (Python with browser) | Desktop app | Not needed |
-   | **Docker/Remote Server** | Web application | `http://YOUR_HOST:8767/` |
+   | **Docker/Remote Server** | Web application | `http://localhost:8767/`<br>or `http://YOUR_DOMAIN:8767/` |
 
    - Name: "Gmail Cleanup" (or anything)
    - Click **Create**
@@ -89,6 +89,8 @@ Lets make this tool a better one by improving as much as possible, All features 
 > **💡 Which should I choose?**
 > - Running locally with Python (`uv run python main.py`)? → **Desktop app**
 > - Running with Docker or on a remote server? → **Web application**
+>
+> **Note**: If using custom port mapping or a custom domain, see [Advanced Configuration](#advanced-configuration) for redirect URI details.
 
 ### 2. Clone the Repository
 
@@ -136,7 +138,7 @@ docker logs $(docker ps -q --filter name=gmail-cleaner)
    - Grant permissions → Click **Continue**
    - Done! You'll see "Authentication flow has completed"
 
-> **🌐 Using a custom domain or remote server?** See [Custom Domain / Reverse Proxy / Remote Server](#custom-domain--reverse-proxy--remote-server) for configuration instructions.
+> **🌐 Using a custom domain, remote server, or custom port mapping?** See [Advanced Configuration](#advanced-configuration) for setup instructions.
 
 #### Persisting Authentication (token.json volume)
 
@@ -189,23 +191,87 @@ The app opens at http://localhost:8766
 
 ## FAQ
 
-**Q: Why do I need to create my own Google Cloud project?**
+**Q: Why do I need to create my own Google Cloud project?**  
 > Because this app accesses your Gmail. By using your own OAuth credentials, you have full control and don't need to trust a third party.
 
-**Q: Is this safe?**
+**Q: Is this safe?**  
 > Yes! The code is open source - you can inspect it. Your emails are processed locally on your machine.
 
-**Q: Can I use this for multiple Gmail accounts?**
+**Q: Can I use this for multiple Gmail accounts?**  
 > Yes! Click "Sign Out" and sign in with a different account. Each account needs to be added as a test user in your Google Cloud project.
 
-**Q: Emails went to Trash, can I recover them?**
+**Q: Emails went to Trash, can I recover them?**  
 > Yes! The delete feature moves emails to Trash. Go to Gmail → Trash to recover within 30 days.
+
+**Q: Having OAuth authentication issues?**  
+> Check the [Troubleshooting](#troubleshooting) section for common solutions.
+
+## Advanced Configuration
+
+### Custom Port Mapping / Docker Port Override
+
+If you're using **custom port mappings** in Docker (e.g., mapping `18766:8766` and `18767:8767`):
+
+1. **Update docker-compose.yml**:
+
+   ```yaml
+   services:
+     gmail-cleaner:
+       ports:
+         - "18766:8766"  # Web UI (external:internal)
+         - "18767:8767"  # OAuth callback (external:internal)
+       environment:
+         - WEB_AUTH=true
+         - OAUTH_EXTERNAL_PORT=18767  # External port that browser will use
+   ```
+
+2. **Update Google Cloud Console** redirect URI:
+   - Go to **Clients** → Your OAuth client → **Authorized redirect URIs**
+   - Update to: `http://localhost:18767/` (or `http://YOUR_DOMAIN:18767/` if using custom domain)
+
+3. **Restart the container**:
+
+   ```bash
+   docker compose down && docker compose up
+   ```
+
+> **💡 How it works**: The app listens on port 8767 inside the container, but sets the OAuth redirect URI to use port 18767 (the external port). Docker forwards the external port to the internal port.
+
+### Custom Domain / Reverse Proxy / Remote Server
+
+If you're accessing via a **custom domain** (e.g., `gmail.example.com`) or **server IP** instead of `localhost`:
+
+> **Important**: Use **Web application** credentials (not Desktop app) for remote server setups. See [Step 7 in Get Google OAuth Credentials](#1-get-google-oauth-credentials).
+
+1. **Update Google Cloud Console**:
+   - Go to **Clients** → Your OAuth client → **Authorized redirect URIs**
+   - Add: `http://YOUR_DOMAIN:8767/` (or external port if using custom mapping)
+
+2. **Update docker-compose.yml**:
+
+   ```yaml
+   environment:
+     - WEB_AUTH=true
+     - OAUTH_HOST=gmail.example.com  # Just the hostname - NO http:// or https://
+     # Optional: If using custom port mapping
+     - OAUTH_EXTERNAL_PORT=18767
+   ```
+
+   > **⚠️ Common mistake**: Use only the hostname (e.g., `gmail.example.com`), NOT the full URL (e.g., ~~`https://gmail.example.com`~~)
+
+3. **For HTTPS with reverse proxy**:
+   - The OAuth callback uses HTTP on port 8767 internally
+   - Your reverse proxy should forward port 8767 for the OAuth callback
+   - The **Authorized redirect URI** in Google Cloud must be `http://YOUR_DOMAIN:8767/` (HTTP, not HTTPS) or use the external port if mapped
+   - Proxy both port 8766 (app) and port 8767 (OAuth callback) through your reverse proxy
 
 ## Troubleshooting
 
-### "Access blocked: Gmail Cleanup has not completed the Google verification process"
+### OAuth & Authentication Issues
 
-This error means you're missing a step in the OAuth setup:
+#### "Access blocked: Gmail Cleanup has not completed the Google verification process"
+
+Your app is missing test users in the OAuth setup:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → Your Project
 2. Go to **APIs & Services** → **OAuth consent screen**
@@ -215,21 +281,19 @@ This error means you're missing a step in the OAuth setup:
 
 > **Why?** Since your app is in "Testing" mode, only emails listed as test users can sign in. This is normal and expected!
 
-### "Error 403: access_denied"
+#### "Error 403: access_denied"
 
 1. Make sure you created your **own** Google Cloud project and credentials
 2. Make sure your email is added as a **Test user**
 3. Make sure you downloaded `credentials.json` and placed it in the project folder
 
-### Docker: "Where do I find the OAuth URL?"
+#### "Google hasn't verified this app" warning
 
-Check the container logs:
-```bash
-docker logs $(docker ps -q --filter name=gmail-cleaner)
-```
-Look for a URL starting with `https://accounts.google.com/o/oauth2/...`
+This is normal for personal OAuth apps! Click **Continue** to proceed.
 
-### Docker: OAuth CSRF Error / State Mismatch
+This warning appears because your app isn't published to Google - which is exactly what we want for privacy!
+
+#### OAuth CSRF Error / State Mismatch
 
 If you see `OAuth error: (mismatching_state) CSRF Warning`:
 
@@ -248,39 +312,15 @@ If you see `OAuth error: (mismatching_state) CSRF Warning`:
 
 4. Copy the OAuth URL from logs and paste in browser
 
-### Custom Domain / Reverse Proxy / Remote Server
+#### Docker: "Where do I find the OAuth URL?"
 
-If you're accessing the app via a **custom domain** (e.g., `gmail.example.com`) or a **server IP** instead of `localhost`:
+Check the container logs:
 
-> **Important**: You must use **Web application** credentials (not Desktop app) for remote server setups. See [Step 7 in Get Google OAuth Credentials](#1-get-google-oauth-credentials).
+```bash
+docker logs $(docker ps -q --filter name=gmail-cleaner)
+```
 
-1. **Create Web application credentials** in Google Cloud Console:
-   - Go to **Clients** → **Create Client** → Select **Web application**
-   - Under **Authorized redirect URIs**, add: `http://YOUR_DOMAIN:8767/`
-   - Download and rename to `credentials.json`
-
-2. **Set the environment variables** in docker-compose.yml:
-   ```yaml
-   environment:
-     - WEB_AUTH=true
-     - OAUTH_HOST=gmail.example.com  # Just the hostname - NO http:// or https://
-   ```
-
-   > **⚠️ Common mistake**: Use only the hostname (e.g., `gmail.example.com`), NOT the full URL (e.g., ~~`https://gmail.example.com`~~)
-
-3. **For HTTPS with reverse proxy**:
-   - The OAuth callback still uses HTTP on port 8767 internally
-   - Your reverse proxy should forward port 8767 for the OAuth callback
-   - The **Authorized redirect URI** in Google Cloud must be `http://YOUR_DOMAIN:8767/` (HTTP, not HTTPS)
-   - Alternatively, you can proxy both ports through HTTPS and update the redirect URI accordingly
-
-> **Note**: The OAuth callback must be reachable from your browser. If using a reverse proxy, you may need to proxy both port 8766 (app) and port 8767 (OAuth callback).
-
-### "Google hasn't verified this app" warning
-
-This is normal for personal OAuth apps! Click **Continue** to proceed.
-
-This warning appears because your app isn't published to Google - which is exactly what we want for privacy!
+Look for a URL starting with `https://accounts.google.com/o/oauth2/...`
 
 ## Contributing
 
@@ -293,5 +333,5 @@ PRs welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
 
 
 <p align="center">
-  Made to help you escape email hell
+  Made to help you escape email hell | have a nice day
 </p>
