@@ -126,9 +126,9 @@ def download_emails_background(senders: list[str]) -> None:
                         "date": headers.get("Date", ""),
                         "labels": ", ".join(msg.get("labelIds", [])),
                         "snippet": msg.get("snippet", "")[:100],
-                        "body": body[:50000]
-                        if body
-                        else "",  # Limit to 50,000 characters
+                        "body": (
+                            body[:50000] if body else ""
+                        ),  # Limit to 50,000 characters
                     }
                 )
 

@@ -12,38 +12,37 @@ from app.services.gmail.helpers import build_gmail_query
 
 
 def get_unread_count() -> dict:
-    """Get count of unread emails in Inbox."""
+    """Get estimated count of unread emails in Inbox (fast, for display)."""
     service, error = get_gmail_service()
     if error:
         return {"count": 0, "error": error}
 
     try:
-        # Simply count unread messages - query and count actual results
+        # Use resultSizeEstimate for fast display (1 API call)
         results = (
             service.users()
             .messages()
-            .list(userId="me", q="is:unread in:inbox", maxResults=500)
+            .list(userId="me", q="is:unread in:inbox", maxResults=1)
             .execute()
         )
 
-        messages = results.get("messages", [])
-        count = len(messages)
-
-        # Check if there are more
-        if results.get("nextPageToken"):
-            count = f"{count}+"
-
+        count = results.get("resultSizeEstimate", 0)
         return {"count": count}
     except Exception as e:
         return {"count": 0, "error": str(e)}
 
 
 def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
-    """Mark unread emails as read."""
+    """Mark unread emails as read.
+
+    Args:
+        count: Number of emails to mark. Use 0 to mark ALL unread emails.
+        filters: Optional filters to apply.
+    """
     # Validate input
-    if count <= 0:
+    if count < 0:
         state.reset_mark_read()
-        state.mark_read_status["error"] = "Count must be greater than 0"
+        state.mark_read_status["error"] = "Count must be 0 or greater"
         state.mark_read_status["done"] = True
         return
 
@@ -64,32 +63,38 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
         if filter_query := build_gmail_query(filters):
             query = f"{query} {filter_query}"
 
+        # count=0 means "all" - no limit
+        mark_all = count == 0
+        limit = count if not mark_all else float("inf")
+
         # Fetch unread messages
         results = (
             service.users()
             .messages()
-            .list(userId="me", q=query, maxResults=min(count, 500))
+            .list(userId="me", q=query, maxResults=500)
             .execute()
         )
 
         messages = results.get("messages", [])
 
-        # Pagination
-        while "nextPageToken" in results and len(messages) < count:
+        # Pagination - continue until we have enough or no more pages
+        while "nextPageToken" in results and len(messages) < limit:
             results = (
                 service.users()
                 .messages()
                 .list(
                     userId="me",
                     q=query,
-                    maxResults=min(count - len(messages), 500),
+                    maxResults=500,
                     pageToken=results["nextPageToken"],
                 )
                 .execute()
             )
             messages.extend(results.get("messages", []))
 
-        messages = messages[:count]
+        # Trim to requested count (unless marking all)
+        if not mark_all:
+            messages = messages[:count]
         total = len(messages)
 
         if total == 0:

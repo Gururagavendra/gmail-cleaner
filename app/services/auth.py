@@ -285,7 +285,9 @@ def get_gmail_service():
 
                     # For Docker: bind to 0.0.0.0 so callback can reach container
                     # For local: bind to localhost for security
-                    bind_address = "0.0.0.0" if is_web_auth_mode() else "localhost"  # nosec B104
+                    bind_address = (
+                        "0.0.0.0" if is_web_auth_mode() else "localhost"
+                    )  # nosec B104
 
                     # Handle custom external port (e.g., Docker port mapping like 18767:8767)
                     # The server listens on the internal port, but the redirect URI uses the external port
