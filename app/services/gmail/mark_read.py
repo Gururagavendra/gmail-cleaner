@@ -65,62 +65,65 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
 
         # count=0 means "all" - no limit
         mark_all = count == 0
-        limit = count if not mark_all else float("inf")
+        page_size = 500
+        batch_size = 100
+        marked = 0
+        remaining = count  # Only used when not mark_all
+        page_token = None
 
-        # Fetch unread messages
-        results = (
-            service.users()
-            .messages()
-            .list(userId="me", q=query, maxResults=500)
-            .execute()
-        )
-
-        messages = results.get("messages", [])
-
-        # Pagination - continue until we have enough or no more pages
-        while "nextPageToken" in results and len(messages) < limit:
+        # Process messages in chunks as we paginate (memory efficient)
+        while True:
+            # Fetch a page of messages
             results = (
                 service.users()
                 .messages()
                 .list(
                     userId="me",
                     q=query,
-                    maxResults=500,
-                    pageToken=results["nextPageToken"],
+                    maxResults=page_size,
+                    pageToken=page_token,
                 )
                 .execute()
             )
-            messages.extend(results.get("messages", []))
 
-        # Trim to requested count (unless marking all)
-        if not mark_all:
-            messages = messages[:count]
-        total = len(messages)
+            messages = results.get("messages", [])
+            if not messages:
+                break
 
-        if total == 0:
+            # Slice to respect remaining count (unless marking all)
+            if not mark_all:
+                messages = messages[:remaining]
+                remaining -= len(messages)
+
+            # Mark this page in batches of 100
+            for i in range(0, len(messages), batch_size):
+                batch = messages[i : i + batch_size]
+                ids = [msg["id"] for msg in batch]
+
+                service.users().messages().batchModify(
+                    userId="me", body={"ids": ids, "removeLabelIds": ["UNREAD"]}
+                ).execute()
+
+                marked += len(ids)
+                state.mark_read_status["message"] = f"Marked {marked} as read..."
+                state.mark_read_status["marked_count"] = marked
+
+            # Stop if we've marked enough (when not marking all)
+            if not mark_all and remaining <= 0:
+                break
+
+            # Check for more pages
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
+
+        if marked == 0:
             state.mark_read_status["message"] = "No unread emails found"
-            state.mark_read_status["done"] = True
-            return
+            state.mark_read_status["progress"] = 100
+        else:
+            state.mark_read_status["message"] = f"Done! Marked {marked} emails as read"
+            state.mark_read_status["progress"] = 100
 
-        # Batch mark as read
-        batch_size = 100
-        marked = 0
-
-        for i in range(0, total, batch_size):
-            batch = messages[i : i + batch_size]
-            ids = [msg["id"] for msg in batch]
-
-            service.users().messages().batchModify(
-                userId="me", body={"ids": ids, "removeLabelIds": ["UNREAD"]}
-            ).execute()
-
-            marked += len(ids)
-            progress = int(marked / total * 100)
-            state.mark_read_status["progress"] = progress
-            state.mark_read_status["message"] = f"Marked {marked}/{total} as read"
-            state.mark_read_status["marked_count"] = marked
-
-        state.mark_read_status["message"] = f"Done! Marked {marked} emails as read"
         state.mark_read_status["done"] = True
 
     except Exception as e:
