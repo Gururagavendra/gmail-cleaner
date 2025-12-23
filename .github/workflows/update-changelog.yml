@@ -15,6 +15,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          ref: main
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -112,6 +113,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git checkout main
           git add CHANGELOG.md
           git diff --staged --quiet || git commit -m "docs: update CHANGELOG.md for release ${{ github.event.release.tag_name }}"
-          git push
+          git push origin main
