@@ -66,9 +66,10 @@ class Settings(BaseSettings):
                     or os.path.isdir(resolved_path)
                 ):
                     # Absolute path unsafe - use safe fallback
-                    self.token_file = os.path.join(
-                        base_dir, os.path.basename(self.token_file)
-                    )
+                    name = os.path.basename(self.token_file)
+                    if name in ("", "."):
+                        name = "token.json"
+                    self.token_file = os.path.join(base_dir, name)
                 else:
                     # Valid absolute path within /app/data (file, not directory)
                     self.token_file = resolved_path
@@ -85,9 +86,10 @@ class Settings(BaseSettings):
                     or os.path.isdir(resolved_path)
                 ):
                     # Path traversal detected or directory path - use safe fallback with basename only
-                    self.token_file = os.path.join(
-                        base_dir, os.path.basename(self.token_file)
-                    )
+                    name = os.path.basename(self.token_file)
+                    if name in ("", "."):
+                        name = "token.json"
+                    self.token_file = os.path.join(base_dir, name)
                 else:
                     # Safe path - use resolved path (file, not directory)
                     self.token_file = resolved_path
