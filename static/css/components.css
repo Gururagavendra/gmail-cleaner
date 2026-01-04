@@ -699,11 +699,11 @@
     .result-content {
         flex-wrap: wrap;
     }
-    
+
     .result-sender {
         width: 100%;
     }
-    
+
     .result-subject {
         width: 100%;
     }
@@ -1070,4 +1070,3 @@
     font-size: 12px;
     color: var(--text-tertiary);
 }
-

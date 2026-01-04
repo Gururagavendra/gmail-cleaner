@@ -14,7 +14,7 @@ GmailCleaner.Labels = {
         try {
             const response = await fetch('/api/labels');
             const data = await response.json();
-            
+
             if (data.success) {
                 this.labels.system = data.system_labels || [];
                 this.labels.user = data.user_labels || [];
@@ -37,13 +37,13 @@ GmailCleaner.Labels = {
                 body: JSON.stringify({ name })
             });
             const result = await response.json();
-            
+
             if (result.success) {
                 // Add to local cache
                 this.labels.user.push(result.label);
                 this.labels.user.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
             }
-            
+
             return result;
         } catch (error) {
             return { success: false, error: error.message };
@@ -56,12 +56,12 @@ GmailCleaner.Labels = {
                 method: 'DELETE'
             });
             const result = await response.json();
-            
+
             if (result.success) {
                 // Remove from local cache
                 this.labels.user = this.labels.user.filter(l => l.id !== labelId);
             }
-            
+
             return result;
         } catch (error) {
             return { success: false, error: error.message };
@@ -98,13 +98,13 @@ GmailCleaner.Labels = {
         try {
             const response = await fetch('/api/label-operation-status');
             const status = await response.json();
-            
+
             if (status.done) {
                 onComplete(status);
             } else {
                 setTimeout(() => this.pollLabelOperation(onComplete), 300);
             }
-            
+
             return status;
         } catch (error) {
             setTimeout(() => this.pollLabelOperation(onComplete), 500);
@@ -115,15 +115,15 @@ GmailCleaner.Labels = {
     showLabelDropdown(buttonElement, onSelect) {
         // Remove any existing dropdown
         this.hideLabelDropdown();
-        
+
         const dropdown = document.createElement('div');
         dropdown.id = 'labelDropdown';
         dropdown.className = 'label-dropdown';
-        
+
         // Build dropdown content
         let html = '<div class="label-dropdown-content">';
         html += '<div class="label-dropdown-header">Select or Create Label</div>';
-        
+
         // Create new label input
         html += `
             <div class="label-create-section">
@@ -131,7 +131,7 @@ GmailCleaner.Labels = {
                 <button id="createLabelBtn" class="label-create-btn">Create</button>
             </div>
         `;
-        
+
         // Existing labels
         if (this.labels.user.length > 0) {
             html += '<div class="label-list-header">Your Labels</div>';
@@ -148,19 +148,19 @@ GmailCleaner.Labels = {
         } else {
             html += '<div class="label-empty">No custom labels yet</div>';
         }
-        
+
         html += '</div>';
         dropdown.innerHTML = html;
-        
+
         // Position dropdown
         const rect = buttonElement.getBoundingClientRect();
         dropdown.style.position = 'fixed';
         dropdown.style.top = (rect.bottom + 5) + 'px';
         dropdown.style.left = rect.left + 'px';
         dropdown.style.zIndex = '10000';
-        
+
         document.body.appendChild(dropdown);
-        
+
         // Event handlers
         dropdown.querySelectorAll('.label-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -170,19 +170,19 @@ GmailCleaner.Labels = {
                 onSelect({ id: labelId, name: labelName });
             });
         });
-        
+
         const createBtn = dropdown.querySelector('#createLabelBtn');
         const newLabelInput = dropdown.querySelector('#newLabelInput');
-        
+
         createBtn.addEventListener('click', async () => {
             const name = newLabelInput.value.trim();
             if (!name) return;
-            
+
             createBtn.disabled = true;
             createBtn.textContent = '...';
-            
+
             const result = await this.createLabel(name);
-            
+
             if (result.success) {
                 this.hideLabelDropdown();
                 onSelect(result.label);
@@ -192,13 +192,13 @@ GmailCleaner.Labels = {
                 createBtn.textContent = 'Create';
             }
         });
-        
+
         newLabelInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 createBtn.click();
             }
         });
-        
+
         // Close on click outside
         setTimeout(() => {
             document.addEventListener('click', this._dropdownClickHandler = (e) => {
@@ -223,7 +223,7 @@ GmailCleaner.Labels = {
     // Show label operation overlay
     showLabelOverlay(action, labelName, emailCount) {
         this.hideLabelOverlay();
-        
+
         const actionText = action === 'apply' ? 'Applying' : 'Removing';
         const overlay = document.createElement('div');
         overlay.id = 'labelOverlay';
@@ -246,7 +246,7 @@ GmailCleaner.Labels = {
     updateLabelOverlay(status) {
         const progressBar = document.getElementById('labelProgressBar');
         const progressText = document.getElementById('labelProgressText');
-        
+
         if (progressBar) {
             progressBar.style.width = status.progress + '%';
         }
@@ -265,19 +265,19 @@ GmailCleaner.Labels = {
     // Show apply label dropdown
     async showApplyLabelDropdown(event) {
         event.stopPropagation();
-        
+
         // Check if senders are selected
         const checkboxes = document.querySelectorAll('.delete-cb:checked');
         if (checkboxes.length === 0) {
             alert('Please select at least one sender first.');
             return;
         }
-        
+
         // Load labels if not loaded
         if (this.labels.user.length === 0 && this.labels.system.length === 0) {
             await this.loadLabels();
         }
-        
+
         this.showLabelDropdown(event.target.closest('button'), async (label) => {
             await this.applyLabelToSelected(label);
         });
@@ -286,19 +286,19 @@ GmailCleaner.Labels = {
     // Show remove label dropdown
     async showRemoveLabelDropdown(event) {
         event.stopPropagation();
-        
+
         // Check if senders are selected
         const checkboxes = document.querySelectorAll('.delete-cb:checked');
         if (checkboxes.length === 0) {
             alert('Please select at least one sender first.');
             return;
         }
-        
+
         // Load labels if not loaded
         if (this.labels.user.length === 0 && this.labels.system.length === 0) {
             await this.loadLabels();
         }
-        
+
         this.showLabelDropdown(event.target.closest('button'), async (label) => {
             await this.removeLabelFromSelected(label);
         });
@@ -308,16 +308,16 @@ GmailCleaner.Labels = {
     async applyLabelToSelected(label) {
         const checkboxes = document.querySelectorAll('.delete-cb:checked');
         const senders = [];
-        
+
         checkboxes.forEach(cb => {
             senders.push(cb.dataset.email);
         });
-        
+
         this.showLabelOverlay('apply', label.name, senders.length);
-        
+
         try {
             const result = await this.applyLabelToSenders(label.id, senders);
-            
+
             if (result.status === 'started') {
                 // Poll for progress
                 this.pollLabelOperation((status) => {
@@ -345,16 +345,16 @@ GmailCleaner.Labels = {
     async removeLabelFromSelected(label) {
         const checkboxes = document.querySelectorAll('.delete-cb:checked');
         const senders = [];
-        
+
         checkboxes.forEach(cb => {
             senders.push(cb.dataset.email);
         });
-        
+
         this.showLabelOverlay('remove', label.name, senders.length);
-        
+
         try {
             const result = await this.removeLabelFromSenders(label.id, senders);
-            
+
             if (result.status === 'started') {
                 // Poll for progress
                 this.pollLabelOperation((status) => {
@@ -385,7 +385,7 @@ GmailCleaner.Labels = {
             alert('Please select at least one sender first.');
             return;
         }
-        
+
         const senders = [];
         let totalEmails = 0;
         checkboxes.forEach(cb => {
@@ -393,22 +393,22 @@ GmailCleaner.Labels = {
             const index = parseInt(cb.dataset.index);
             totalEmails += GmailCleaner.deleteResults[index]?.count || 0;
         });
-        
+
         if (!confirm(`Archive emails from ${senders.length} sender(s)?\n\nThis will remove ${totalEmails} emails from your inbox but keep them in "All Mail".`)) {
             return;
         }
-        
+
         this.showArchiveOverlay(senders.length);
-        
+
         try {
             const response = await fetch('/api/archive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.status === 'started') {
                 this.pollArchiveStatus();
             } else if (result.error) {
@@ -425,9 +425,9 @@ GmailCleaner.Labels = {
         try {
             const response = await fetch('/api/archive-status');
             const status = await response.json();
-            
+
             this.updateArchiveOverlay(status);
-            
+
             if (status.done) {
                 this.hideArchiveOverlay();
                 if (status.error) {
@@ -446,7 +446,7 @@ GmailCleaner.Labels = {
     showArchiveOverlay(senderCount) {
         this.hideLabelOverlay();
         this.hideArchiveOverlay();
-        
+
         const overlay = document.createElement('div');
         overlay.id = 'archiveOverlay';
         overlay.className = 'label-overlay';
@@ -469,7 +469,7 @@ GmailCleaner.Labels = {
     updateArchiveOverlay(status) {
         const progressBar = document.getElementById('archiveProgressBar');
         const progressText = document.getElementById('archiveProgressText');
-        
+
         if (progressBar) {
             progressBar.style.width = status.progress + '%';
         }
@@ -492,7 +492,7 @@ GmailCleaner.Labels = {
             alert('Please select at least one sender first.');
             return;
         }
-        
+
         const senders = [];
         let totalEmails = 0;
         checkboxes.forEach(cb => {
@@ -500,22 +500,22 @@ GmailCleaner.Labels = {
             const index = parseInt(cb.dataset.index);
             totalEmails += GmailCleaner.deleteResults[index]?.count || 0;
         });
-        
+
         if (!confirm(`Mark ${totalEmails} emails from ${senders.length} sender(s) as important?`)) {
             return;
         }
-        
+
         this.showImportantOverlay(senders.length);
-        
+
         try {
             const response = await fetch('/api/mark-important', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders, important: true })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.status === 'started') {
                 this.pollImportantStatus();
             } else if (result.error) {
@@ -532,9 +532,9 @@ GmailCleaner.Labels = {
         try {
             const response = await fetch('/api/important-status');
             const status = await response.json();
-            
+
             this.updateImportantOverlay(status);
-            
+
             if (status.done) {
                 this.hideImportantOverlay();
                 if (status.error) {
@@ -554,7 +554,7 @@ GmailCleaner.Labels = {
         this.hideLabelOverlay();
         this.hideArchiveOverlay();
         this.hideImportantOverlay();
-        
+
         const overlay = document.createElement('div');
         overlay.id = 'importantOverlay';
         overlay.className = 'label-overlay';
@@ -577,7 +577,7 @@ GmailCleaner.Labels = {
     updateImportantOverlay(status) {
         const progressBar = document.getElementById('importantProgressBar');
         const progressText = document.getElementById('importantProgressText');
-        
+
         if (progressBar) {
             progressBar.style.width = status.progress + '%';
         }

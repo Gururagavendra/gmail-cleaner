@@ -23,17 +23,17 @@ GmailCleaner.Delete = {
                 return null;
             }
         };
-        
+
         const first = formatDate(firstDate);
         const last = formatDate(lastDate);
-        
+
         if (!first || !last) return '';
         if (first === last) return first;
-        
+
         // Compare dates to determine order (oldest to newest)
         const firstDateObj = new Date(firstDate);
         const lastDateObj = new Date(lastDate);
-        
+
         if (firstDateObj <= lastDateObj) {
             return `${first} to ${last}`;
         } else {
@@ -43,20 +43,20 @@ GmailCleaner.Delete = {
 
     async startScan() {
         if (GmailCleaner.deleteScanning) return;
-        
+
         const authResponse = await fetch('/api/auth-status');
         const authStatus = await authResponse.json();
-        
+
         if (!authStatus.logged_in) {
             GmailCleaner.Auth.signIn();
             return;
         }
-        
+
         GmailCleaner.deleteScanning = true;
-        
+
         const scanBtn = document.getElementById('deleteScanBtn');
         const progressCard = document.getElementById('deleteProgressCard');
-        
+
         scanBtn.disabled = true;
         scanBtn.innerHTML = `
             <svg class="spinner" viewBox="0 0 24 24" width="18" height="18">
@@ -65,26 +65,26 @@ GmailCleaner.Delete = {
             Scanning...
         `;
         progressCard.classList.remove('hidden');
-        
+
         const limit = document.getElementById('deleteScanLimit').value;
         const filters = GmailCleaner.Filters.get();
-        
+
         try {
             const response = await fetch('/api/delete-scan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     limit: parseInt(limit),
                     filters: filters
                 })
             });
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 const errorMsg = errorData.detail || `Request failed with status ${response.status}`;
                 throw new Error(errorMsg);
             }
-            
+
             this.pollProgress();
         } catch (error) {
             alert('Error: ' + error.message);
@@ -96,13 +96,13 @@ GmailCleaner.Delete = {
         try {
             const response = await fetch('/api/delete-scan-status');
             const status = await response.json();
-            
+
             const progressBar = document.getElementById('deleteProgressBar');
             const progressText = document.getElementById('deleteProgressText');
-            
+
             progressBar.style.width = status.progress + '%';
             progressText.textContent = status.message;
-            
+
             if (status.done) {
                 if (!status.error) {
                     const resultsResponse = await fetch('/api/delete-scan-results');
@@ -137,28 +137,28 @@ GmailCleaner.Delete = {
         const resultsSection = document.getElementById('deleteResultsSection');
         const noResults = document.getElementById('deleteNoResults');
         const badge = document.getElementById('deleteSendersBadge');
-        
+
         resultsList.innerHTML = '';
         badge.textContent = GmailCleaner.deleteResults.length;
-        
+
         if (GmailCleaner.deleteResults.length === 0) {
             resultsSection.classList.add('hidden');
             noResults.classList.remove('hidden');
             this.setActionButtonsEnabled(false);
             return;
         }
-        
+
         resultsSection.classList.remove('hidden');
         noResults.classList.add('hidden');
         this.setActionButtonsEnabled(true);
-        
+
         GmailCleaner.deleteResults.forEach((r, i) => {
             const item = document.createElement('div');
             item.className = 'result-item';
-            
+
             const dateRange = this.formatDateRange(r.first_date, r.last_date);
             const dateRangeDisplay = dateRange ? `<div class="result-date-range">${dateRange}</div>` : '';
-            
+
             item.innerHTML = `
                 <label class="checkbox-wrapper result-checkbox">
                     <input type="checkbox" class="delete-cb" data-index="${i}" data-email="${GmailCleaner.UI.escapeHtml(r.email)}">
@@ -208,11 +208,11 @@ GmailCleaner.Delete = {
     async deleteSenderEmails(index) {
         const r = GmailCleaner.deleteResults[index];
         const btn = document.getElementById('delete-' + index);
-        
+
         if (!confirm(`Delete ALL ${r.count} emails from ${r.email}?\n\nThis will move them to Trash.`)) {
             return;
         }
-        
+
         btn.disabled = true;
         btn.classList.add('btn-deleting');
         btn.innerHTML = `
@@ -221,7 +221,7 @@ GmailCleaner.Delete = {
             </svg>
             Deleting...
         `;
-        
+
         try {
             const response = await fetch('/api/delete-emails', {
                 method: 'POST',
@@ -229,7 +229,7 @@ GmailCleaner.Delete = {
                 body: JSON.stringify({ sender: r.email })
             });
             const result = await response.json();
-            
+
             if (result.success) {
                 btn.classList.remove('btn-deleting');
                 btn.innerHTML = '✓ Deleted!';
@@ -259,7 +259,7 @@ GmailCleaner.Delete = {
             alert('Please select at least one sender to delete emails from.');
             return;
         }
-        
+
         let totalEmails = 0;
         const senderEmails = [];
         checkboxes.forEach(cb => {
@@ -268,14 +268,14 @@ GmailCleaner.Delete = {
             totalEmails += r.count;
             senderEmails.push(r.email);
         });
-        
+
         if (!confirm(`Delete ${totalEmails} emails from ${checkboxes.length} senders?\n\nThis will move them to Trash.`)) {
             return;
         }
-        
+
         // Show bulk delete overlay with progress bar
         this.showDeleteOverlay(checkboxes.length, totalEmails);
-        
+
         checkboxes.forEach(cb => {
             const index = parseInt(cb.dataset.index);
             const btn = document.getElementById('delete-' + index);
@@ -290,7 +290,7 @@ GmailCleaner.Delete = {
                 `;
             }
         });
-        
+
         try {
             // Start the background task
             await fetch('/api/delete-emails-bulk', {
@@ -298,7 +298,7 @@ GmailCleaner.Delete = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders: senderEmails })
             });
-            
+
             // Poll for progress
             this.pollDeleteProgress(checkboxes);
         } catch (error) {
@@ -311,13 +311,13 @@ GmailCleaner.Delete = {
         try {
             const response = await fetch('/api/delete-bulk-status');
             const status = await response.json();
-            
+
             // Update progress bar in overlay
             this.updateDeleteOverlay(status);
-            
+
             if (status.done) {
                 this.hideDeleteOverlay();
-                
+
                 if (!status.error) {
                     checkboxes.forEach(cb => {
                         const index = parseInt(cb.dataset.index);
@@ -328,7 +328,7 @@ GmailCleaner.Delete = {
                             btn.classList.add('success');
                         }
                     });
-                    
+
                     setTimeout(async () => {
                         const resultsResponse = await fetch('/api/delete-scan-results');
                         GmailCleaner.deleteResults = await resultsResponse.json();
@@ -359,7 +359,7 @@ GmailCleaner.Delete = {
     showDeleteOverlay(senderCount, emailCount) {
         // Remove any existing overlay
         this.hideDeleteOverlay();
-        
+
         const overlay = document.createElement('div');
         overlay.id = 'deleteOverlay';
         overlay.className = 'delete-overlay';
@@ -385,7 +385,7 @@ GmailCleaner.Delete = {
         const progressText = document.getElementById('deleteBulkProgressText');
         const stats = document.getElementById('deleteBulkStats');
         const overlay = document.getElementById('deleteOverlay');
-        
+
         if (progressBar) {
             progressBar.style.width = status.progress + '%';
         }
@@ -418,7 +418,7 @@ GmailCleaner.Delete = {
             GmailCleaner.UI.showInfoToast('Please select at least one sender to download emails from.');
             return;
         }
-        
+
         let totalEmails = 0;
         const senderEmails = [];
         checkboxes.forEach(cb => {
@@ -427,10 +427,10 @@ GmailCleaner.Delete = {
             totalEmails += r.count;
             senderEmails.push(r.email);
         });
-        
+
         // Show download overlay
         this.showDownloadOverlay(checkboxes.length, totalEmails);
-        
+
         try {
             // Start background download
             await fetch('/api/download-emails', {
@@ -438,7 +438,7 @@ GmailCleaner.Delete = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders: senderEmails })
             });
-            
+
             // Poll for progress
             this.pollDownloadProgress();
         } catch (error) {
@@ -451,9 +451,9 @@ GmailCleaner.Delete = {
         try {
             const response = await fetch('/api/download-status');
             const status = await response.json();
-            
+
             this.updateDownloadOverlay(status);
-            
+
             if (status.done) {
                 if (!status.error) {
                     // Trigger CSV download
@@ -479,7 +479,7 @@ GmailCleaner.Delete = {
 
     showDownloadOverlay(senderCount, emailCount) {
         this.hideDownloadOverlay();
-        
+
         const overlay = document.createElement('div');
         overlay.id = 'downloadOverlay';
         overlay.className = 'download-overlay';
@@ -504,11 +504,11 @@ GmailCleaner.Delete = {
     updateDownloadOverlay(status) {
         const overlay = document.getElementById('downloadOverlay');
         if (!overlay) return;
-        
+
         const progressBar = document.getElementById('downloadProgressBar');
         const progressText = document.getElementById('downloadProgressText');
         const stats = document.getElementById('downloadStats');
-        
+
         if (progressBar) {
             progressBar.style.width = status.progress + '%';
         }

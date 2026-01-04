@@ -17,6 +17,7 @@ dependencies = [
     "fastapi>=0.122.0",
     "uvicorn>=0.38.0",
     "pydantic-settings>=2.11.0",
+    "jinja2>=3.1.6",
 ]
 
 [project.urls]
@@ -62,4 +63,12 @@ reportMissingTypeStubs = false
 reportUnknownMemberType = false
 reportUnknownArgumentType = false
 reportUnknownVariableType = false
+reportOptionalMemberAccess = false
 reportAttributeAccessIssue = false
+ignoreUnknownImports = true
+
+[tool.ruff]
+# Ignore unused imports (F401) in __init__.py files
+# These imports are used for re-exports, so they're not actually unused
+[tool.ruff.lint]
+per-file-ignores = { "**/__init__.py" = ["F401"] }

@@ -80,4 +80,3 @@ jobs:
 
       - name: Python Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
-

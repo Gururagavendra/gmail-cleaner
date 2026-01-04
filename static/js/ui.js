@@ -17,19 +17,19 @@ GmailCleaner.UI = {
 
     showView(viewName) {
         GmailCleaner.currentView = viewName;
-        
+
         // Hide all views
         document.querySelectorAll('.view').forEach(view => {
             view.classList.add('hidden');
         });
-        
+
         // Show requested view
         const viewId = viewName + 'View';
         const view = document.getElementById(viewId);
         if (view) {
             view.classList.remove('hidden');
         }
-        
+
         // Update nav active state
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
@@ -37,7 +37,7 @@ GmailCleaner.UI = {
                 item.classList.add('active');
             }
         });
-        
+
         // Special handling for unsubscribe view
         if (viewName === 'unsubscribe') {
             if (GmailCleaner.results.length === 0) {
@@ -48,7 +48,7 @@ GmailCleaner.UI = {
                 document.getElementById('resultsSection').classList.remove('hidden');
             }
         }
-        
+
         // Refresh unread count when switching to Mark Read view
         if (viewName === 'markread') {
             GmailCleaner.MarkRead.refreshUnreadCount();
@@ -93,7 +93,7 @@ GmailCleaner.UI = {
         // Create toast element
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
-        
+
         // Icon based on type
         const icons = {
             success: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>',

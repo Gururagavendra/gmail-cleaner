@@ -12,20 +12,16 @@ from .auth import (
 from .gmail import (
     # Filters
     build_gmail_query,
-    
     # Scanning
     scan_emails,
     get_scan_status,
     get_scan_results,
-    
     # Unsubscribe
     unsubscribe_single,
-    
     # Mark as read
     get_unread_count,
     mark_emails_as_read,
     get_mark_read_status,
-    
     # Delete
     scan_senders_for_delete,
     get_delete_scan_status,
@@ -34,12 +30,10 @@ from .gmail import (
     delete_emails_bulk,
     delete_emails_bulk_background,
     get_delete_bulk_status,
-    
     # Download
     download_emails_background,
     get_download_status,
     get_download_csv,
-    
     # Labels
     get_labels,
     create_label,
@@ -47,11 +41,9 @@ from .gmail import (
     apply_label_to_senders_background,
     remove_label_from_senders_background,
     get_label_operation_status,
-    
     # Archive
     archive_emails_background,
     get_archive_status,
-    
     # Mark Important
     mark_important_background,
     get_important_status,

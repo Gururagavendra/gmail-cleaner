@@ -21,3 +21,6 @@ credentials.json
 # OS
 .DS_Store
 Thumbs.db
+
+# GitHub Pages (not needed in Docker)
+docs/

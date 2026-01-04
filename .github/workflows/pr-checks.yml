@@ -1,0 +1,68 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, labeled, unlabeled]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  require-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for labels
+        id: check-labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const labels = pr.labels || [];
+
+            if (labels.length === 0) {
+              core.setFailed('❌ This PR must have at least one label before it can be merged.');
+              core.summary
+                .addHeading('Label Required')
+                .addRaw('This pull request requires at least one label to be merged.')
+                .addRaw('Please add a label to your PR.')
+                .write();
+            } else {
+              console.log(`✅ PR has ${labels.length} label(s): ${labels.map(l => l.name).join(', ')}`);
+              core.summary
+                .addHeading('Labels Check')
+                .addRaw(`✅ PR has ${labels.length} label(s): ${labels.map(l => l.name).join(', ')}`)
+                .write();
+            }
+
+  auto-assign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-assign PR creator
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const creator = pr.user.login;
+
+            // Get current assignees from webhook payload
+            const currentAssignees = (pr.assignees || []).map(a => a.login);
+
+            // Add creator if not already assigned
+            // Add creator if not already assigned
+            if (!currentAssignees.includes(creator)) {
+              try {
+                await github.rest.issues.addAssignees({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  assignees: [creator],
+                });
+                console.log(`✅ Auto-assigned ${creator} to PR #${pr.number}`);
+              } catch (error) {
+                console.error(`❌ Failed to auto-assign ${creator}: ${error.message}`);
+                core.warning(`Could not auto-assign PR creator: ${error.message}`);
+              }
+            } else {
+              console.log(`ℹ️ ${creator} is already assigned to PR #${pr.number}`);
+            }

@@ -32,7 +32,7 @@ GmailCleaner.Filters = {
             const today = new Date();
             const sevenDaysAgo = new Date(today);
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            
+
             // Initialize Litepicker with 7-day default window using Date objects
             this.litepicker = new Litepicker({
                 element: dateRangeInput,
@@ -56,17 +56,17 @@ GmailCleaner.Filters = {
             // Allow manual typing in the date input field
             dateRangeInput.removeAttribute('readonly');
             dateRangeInput.placeholder = 'YYYY-MM-DD - YYYY-MM-DD';
-            
+
             dateRangeInput.addEventListener('click', () => {
                 // Ensure widget shows when clicking the input
                 if (this.litepicker) {
                     this.litepicker.show();
                 }
             });
-            
+
             dateRangeInput.addEventListener('keydown', (e) => {
                 // Allow typing and common keys
-                if (!['Tab', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key) && 
+                if (!['Tab', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key) &&
                     !e.key.match(/[0-9\-\s]/)) {
                     e.preventDefault();
                 }
@@ -79,7 +79,7 @@ GmailCleaner.Filters = {
     handleOlderThanChange(event) {
         const value = event.target.value;
         const dateRangeGroup = document.getElementById('dateRangeGroup');
-        
+
         if (value === 'custom') {
             // Show custom date range picker
             dateRangeGroup?.classList.remove('hidden');
@@ -108,11 +108,11 @@ GmailCleaner.Filters = {
                 // Parse the date range from the input (format: YYYY-MM-DD - YYYY-MM-DD)
                 const dateRangeText = dateRangeInput.value;
                 const dates = dateRangeText.split(' - ');
-                
+
                 if (dates.length === 2) {
                     const startDateStr = dates[0].trim();
                     const endDateStr = dates[1].trim();
-                    
+
                     // Validate date formats
                     if (/^\d{4}-\d{2}-\d{2}$/.test(startDateStr) && /^\d{4}-\d{2}-\d{2}$/.test(endDateStr)) {
                         // Convert YYYY-MM-DD to YYYY/MM/DD format for Gmail API
@@ -121,7 +121,7 @@ GmailCleaner.Filters = {
                         const endDate = new Date(endDateStr + 'T00:00:00');
                         endDate.setDate(endDate.getDate() + 1);
                         beforeDate = endDate.toISOString().split('T')[0].replace(/-/g, '/');
-                        
+
                         console.log('Date range filter:', { startDateStr, endDateStr, afterDate, beforeDate });
                     }
                 }
@@ -134,7 +134,7 @@ GmailCleaner.Filters = {
         const category = document.getElementById('filterCategory')?.value || '';
         const sender = document.getElementById('filterSender')?.value?.trim() || '';
         const label = document.getElementById('filterLabel')?.value || '';
-        
+
         return {
             older_than: olderThan,
             after_date: afterDate,
@@ -153,18 +153,18 @@ GmailCleaner.Filters = {
         const sender = document.getElementById('filterSender');
         const label = document.getElementById('filterLabel');
         const dateRangeGroup = document.getElementById('dateRangeGroup');
-        
+
         if (olderThan) olderThan.value = '';
         if (largerThan) largerThan.value = '';
         if (category) category.value = '';
         if (sender) sender.value = '';
         if (label) label.value = '';
-        
+
         // Clear date picker
         if (this.litepicker) {
             this.litepicker.setDateRange(null, null);
         }
-        
+
         // Hide date range group
         if (dateRangeGroup) {
             dateRangeGroup.classList.add('hidden');
@@ -174,10 +174,10 @@ GmailCleaner.Filters = {
     populateLabelDropdown(labels) {
         const select = document.getElementById('filterLabel');
         if (!select) return;
-        
+
         // Keep the default option
         select.innerHTML = '<option value="">All labels</option>';
-        
+
         // Add user labels
         if (labels && labels.length > 0) {
             labels.forEach(label => {
@@ -192,7 +192,7 @@ GmailCleaner.Filters = {
     showBar(show) {
         const filterBar = document.getElementById('filterBar');
         const mainContent = document.querySelector('.main-content');
-        
+
         if (filterBar) {
             if (show) {
                 filterBar.classList.remove('hidden');

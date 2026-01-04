@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false # Set to true if you want to test beta features
+
+# Customize the tone of CodeRabbit's responses
+tone_instructions: "Add reviews that make the product stronger. Focus on modular code, and provide good explanations of the issue and solution. Be concise but helpful."
+
+reviews:
+  # General settings for a small team
+  profile: "chill"             # "chill" reduces noise; change to "assertive" for stricter reviews
+  high_level_summary: true     # Creates the "Summary" section at the top of the PR
+  # This customizes the summary and removes the default "Tip" footer
+  high_level_summary_instructions: >
+    Provide a concise summary of the changes in bullet points.
+    Do not include any 'Tips', footers, or instructions on how to customize settings.
+  poem: true                   # Fun little poem at the end (set to false if you hate fun)
+  review_status: true          # Updates the PR status check
+  collapse_walkthrough: false  # Keeps the "Walkthrough" expanded so you can see changes easily
+
+  # Auto-review settings
+  auto_review:
+    enabled: true
+    drafts: false              # Won't review Draft PRs (saves noise)
+    base_branches: ["main"] # Only reviews PRs merging into these branches
+
+  # Path filters to exclude files from review
+  path_filters:
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/dist/**"
+    - "!**/build/**"
+
+chat:
+  auto_reply: true             # Allows you to reply to CodeRabbit comments and have it answer back
+
+issue_enrichment:
+  auto_enrich:
+    enabled: false
