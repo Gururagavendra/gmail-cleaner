@@ -238,7 +238,13 @@
                                 <span class="results-count"><span id="resultsBadge">0</span> senders found</span>
                             </div>
                             <div class="toolbar-right">
-                                <button class="btn btn-primary" onclick="unsubscribeSelected()">
+                                <button class="btn btn-danger" onclick="deleteSelectedSubscriptions()" title="Move all emails from selected senders to Trash">
+                                    Delete Selected
+                                </button>
+                                <button class="btn btn-combo" onclick="unsubscribeAndDeleteSelected()" title="Unsubscribe from selected senders and move their emails to Trash">
+                                    Unsub & Delete Selected
+                                </button>
+                                <button class="btn btn-primary" onclick="unsubscribeSelected()" title="Unsubscribe from selected senders (emails remain in inbox)">
                                     Unsubscribe Selected
                                 </button>
                             </div>

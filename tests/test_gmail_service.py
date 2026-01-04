@@ -222,3 +222,65 @@ class TestGetSubject:
             {'name': 'Subject', 'value': '🎉 Special Offer! 50% Off 🎁'},
         ]
         assert _get_subject(headers) == '🎉 Special Offer! 50% Off 🎁'
+
+
+class TestSenderEmailForDeletion:
+    """Tests for email extraction used in delete operations.
+
+    The delete feature uses the email field from scan results to identify
+    which sender's emails to delete. These tests verify email extraction
+    produces valid addresses for the delete query.
+    """
+
+    def test_newsletter_sender_extracts_valid_email(self):
+        """Newsletter sender should extract valid email for deletion."""
+        headers = [
+            {'name': 'From', 'value': 'Newsletter <news@example.com>'},
+            {'name': 'List-Unsubscribe', 'value': '<https://example.com/unsub>'},
+        ]
+        name, email = _get_sender_info(headers)
+        assert email == 'news@example.com'
+        assert '@' in email
+
+    def test_promotional_sender_extracts_valid_email(self):
+        """Promotional email sender should extract valid email."""
+        headers = [
+            {'name': 'From', 'value': '"Company Sales" <sales@company.com>'},
+        ]
+        name, email = _get_sender_info(headers)
+        assert email == 'sales@company.com'
+        assert '@' in email
+
+    def test_extracted_email_usable_in_gmail_query(self):
+        """Extracted email should be usable in from: query."""
+        headers = [
+            {'name': 'From', 'value': 'Marketing Team <marketing@newsletter.example.com>'},
+        ]
+        name, email = _get_sender_info(headers)
+        query = f'from:{email}'
+        assert query == 'from:marketing@newsletter.example.com'
+        assert ' ' not in email
+
+    def test_sender_filter_query_construction(self):
+        """Verify sender filter query is correctly constructed."""
+        filters = {'sender': 'newsletter@example.com'}
+        query = build_gmail_query(filters)
+        assert query == 'from:newsletter@example.com'
+
+    def test_email_with_subdomain_extracts_correctly(self):
+        """Email with subdomain should extract correctly."""
+        headers = [
+            {'name': 'From', 'value': 'Updates <updates@mail.service.example.com>'},
+        ]
+        name, email = _get_sender_info(headers)
+        assert email == 'updates@mail.service.example.com'
+        assert '@' in email
+
+    def test_email_extraction_strips_whitespace(self):
+        """Email extraction should handle headers with extra whitespace."""
+        headers = [
+            {'name': 'From', 'value': '  Newsletter  < news@example.com >'},
+        ]
+        name, email = _get_sender_info(headers)
+        assert email.strip() == email
+        assert '@' in email
