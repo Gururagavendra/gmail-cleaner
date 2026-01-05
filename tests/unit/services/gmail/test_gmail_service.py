@@ -234,7 +234,7 @@ class TestSenderEmailForDeletion:
             {"name": "From", "value": "Newsletter <news@example.com>"},
             {"name": "List-Unsubscribe", "value": "<https://example.com/unsub>"},
         ]
-        name, email = _get_sender_info(headers)
+        _name, email = _get_sender_info(headers)
         assert email == "news@example.com"
         assert "@" in email
 
@@ -243,7 +243,7 @@ class TestSenderEmailForDeletion:
         headers = [
             {"name": "From", "value": '"Company Sales" <sales@company.com>'},
         ]
-        name, email = _get_sender_info(headers)
+        _name, email = _get_sender_info(headers)
         assert email == "sales@company.com"
         assert "@" in email
 
@@ -252,7 +252,7 @@ class TestSenderEmailForDeletion:
         headers = [
             {"name": "From", "value": "Marketing Team <marketing@newsletter.example.com>"},
         ]
-        name, email = _get_sender_info(headers)
+        _name, email = _get_sender_info(headers)
         query = f"from:{email}"
         assert query == "from:marketing@newsletter.example.com"
         assert " " not in email
@@ -268,7 +268,7 @@ class TestSenderEmailForDeletion:
         headers = [
             {"name": "From", "value": "Updates <updates@mail.service.example.com>"},
         ]
-        name, email = _get_sender_info(headers)
+        _name, email = _get_sender_info(headers)
         assert email == "updates@mail.service.example.com"
         assert "@" in email
 
@@ -277,6 +277,7 @@ class TestSenderEmailForDeletion:
         headers = [
             {"name": "From", "value": "  Newsletter  < news@example.com >"},
         ]
-        name, email = _get_sender_info(headers)
+        _name, email = _get_sender_info(headers)
+        assert email == "news@example.com"
         assert email.strip() == email
         assert "@" in email

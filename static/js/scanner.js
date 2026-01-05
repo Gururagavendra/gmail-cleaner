@@ -388,7 +388,6 @@ GmailCleaner.Scanner = {
                 r.count = 0;
             } else {
                 btn.classList.remove('btn-deleting');
-                btn.innerHTML = 'Error';
                 alert('Error: ' + result.message);
                 btn.disabled = false;
                 btn.innerHTML = `Delete ${r.count}`;
@@ -496,7 +495,6 @@ GmailCleaner.Scanner = {
                 GmailCleaner.UI.showSuccessToast(toastMsg);
             } else {
                 comboBtn.classList.remove('btn-deleting');
-                comboBtn.innerHTML = 'Error';
                 alert('Delete failed: ' + deleteResult.message);
                 comboBtn.disabled = false;
                 comboBtn.innerHTML = 'Unsub & Delete';
@@ -570,7 +568,25 @@ GmailCleaner.Scanner = {
         }
     },
 
-    async pollDeleteProgress(checkboxes, indices) {
+    async pollDeleteProgress(checkboxes, indices, startTime = Date.now()) {
+        const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+        if (Date.now() - startTime > TIMEOUT_MS) {
+            this.hideDeleteOverlay();
+            alert('Operation timed out. Please check your Trash folder to verify results.');
+            checkboxes.forEach(cb => {
+                const index = parseInt(cb.dataset.index);
+                const r = GmailCleaner.results[index];
+                const btn = document.getElementById('del-' + index);
+                if (btn && r) {
+                    btn.classList.remove('btn-deleting');
+                    btn.disabled = false;
+                    btn.innerHTML = `Delete ${r.count}`;
+                }
+            });
+            return;
+        }
+
         try {
             const response = await fetch('/api/delete-bulk-status');
             const status = await response.json();
@@ -635,10 +651,10 @@ GmailCleaner.Scanner = {
                     });
                 }
             } else {
-                setTimeout(() => this.pollDeleteProgress(checkboxes, indices), 300);
+                setTimeout(() => this.pollDeleteProgress(checkboxes, indices, startTime), 300);
             }
         } catch (error) {
-            setTimeout(() => this.pollDeleteProgress(checkboxes, indices), 500);
+            setTimeout(() => this.pollDeleteProgress(checkboxes, indices, startTime), 500);
         }
     },
 
@@ -748,6 +764,7 @@ GmailCleaner.Scanner = {
 
         let processedCount = 0;
         let deletedEmails = 0;
+        const failedItems = [];
 
         for (const { index, r, type } of selected) {
             try {
@@ -818,6 +835,7 @@ GmailCleaner.Scanner = {
 
             } catch (error) {
                 console.error(`Error processing ${r.domain}:`, error);
+                failedItems.push(r.domain);
             }
         }
 
@@ -827,7 +845,11 @@ GmailCleaner.Scanner = {
         checkboxes.forEach(cb => cb.checked = false);
         document.getElementById('selectAll').checked = false;
 
-        GmailCleaner.UI.showSuccessToast(`Processed ${processedCount} senders, moved ${deletedEmails} emails to Trash.`);
+        let message = `Processed ${processedCount} senders, moved ${deletedEmails} emails to Trash.`;
+        if (failedItems.length > 0) {
+            message += ` (${failedItems.length} failed)`;
+        }
+        GmailCleaner.UI.showSuccessToast(message);
     }
 };
 

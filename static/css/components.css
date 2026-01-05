@@ -133,12 +133,12 @@
 }
 
 .btn-combo {
-    background: #7c3aed;
+    background: var(--combo-color);
     color: white;
 }
 
 .btn-combo:hover {
-    background: #6d28d9;
+    background: var(--combo-hover);
 }
 
 .btn-download {
@@ -412,12 +412,12 @@
 }
 
 .unsub-btn.combo-btn {
-    background: #7c3aed;
+    background: var(--combo-color);
     color: white;
 }
 
 .unsub-btn.combo-btn:hover {
-    background: #6d28d9;
+    background: var(--combo-hover);
 }
 
 .result-count.deleted {
