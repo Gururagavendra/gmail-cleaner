@@ -137,6 +137,12 @@ def build_gmail_query(filters: Optional[Union[dict, Any]] = None) -> str:
     if label := filters.get("label", ""):
         query_parts.append(f"label:{label}")
 
+    has_attachment = filters.get("has_attachment", "")
+    if has_attachment == "has":
+        query_parts.append("has:attachment")
+    elif has_attachment == "none":
+        query_parts.append("-has:attachment")
+
     return " ".join(query_parts)
 
 

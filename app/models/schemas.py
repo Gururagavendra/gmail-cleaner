@@ -34,6 +34,9 @@ class FiltersModel(BaseModel):
         description="Filter emails from specific sender (email address or domain)",
     )
     label: Optional[str] = Field(default=None, description="Gmail label filter")
+    has_attachment: Optional[str] = Field(
+        default=None, description="Filter by attachment: 'has' or 'none'"
+    )
 
     @field_validator("older_than")
     @classmethod
@@ -94,6 +97,15 @@ class FiltersModel(BaseModel):
         if "@" not in sender and "." not in sender:
             raise ValueError("sender must be a valid email address or domain")
         return sender
+
+    @field_validator("has_attachment")
+    @classmethod
+    def validate_has_attachment(cls, v) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        if v not in ("has", "none"):
+            raise ValueError('has_attachment must be "has" or "none"')
+        return v
 
 
 # ----- Request Models -----
