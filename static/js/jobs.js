@@ -32,7 +32,9 @@ GmailCleaner.Jobs = {
             const customLabels = userLabels;
             const mailboxSel = document.getElementById('jobMailbox');
             // Remove any previously appended custom labels before re-adding
-            mailboxSel.querySelectorAll('.custom-label-opt').forEach(el => el.remove());
+            mailboxSel.querySelectorAll('.custom-label-opt').forEach((el) => {
+                el.remove();
+            });
             if (customLabels.length > 0) {
                 const sep = document.createElement('option');
                 sep.disabled = true;
@@ -126,9 +128,12 @@ GmailCleaner.Jobs = {
         cancelBtn.textContent = 'Cancelling...';
 
         try {
-            await fetch('/api/job/cancel', { method: 'POST' });
-        } catch (_) {
-            // ignore — polling will pick up the cancelled state
+            const res = await fetch('/api/job/cancel', { method: 'POST' });
+            if (!res.ok) throw new Error(`${res.status}`);
+        } catch (e) {
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = 'Cancel';
+            alert(`Failed to cancel job: ${e.message}. Please try again.`);
         }
     },
 
@@ -164,26 +169,35 @@ GmailCleaner.Jobs = {
 
     startPolling() {
         this.stopPolling();
-        this.pollInterval = setInterval(() => this.pollStatus(), 500);
+        this._polling = true;
+        this._schedulePoll();
     },
 
     stopPolling() {
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-            this.pollInterval = null;
+        this._polling = false;
+        if (this.pollTimeout) {
+            clearTimeout(this.pollTimeout);
+            this.pollTimeout = null;
         }
     },
 
+    _schedulePoll() {
+        this.pollTimeout = setTimeout(() => this.pollStatus(), 500);
+    },
+
     async pollStatus() {
+        if (!this._polling) return;
         try {
             const res = await fetch('/api/job/status');
-            if (!res.ok) return;
-            const s = await res.json();
-            this.updateUI(s);
-            if (s.done) this.stopPolling();
+            if (res.ok) {
+                const s = await res.json();
+                this.updateUI(s);
+                if (s.done) { this.stopPolling(); return; }
+            }
         } catch (_) {
             // ignore transient network errors
         }
+        if (this._polling) this._schedulePoll();
     },
 
     updateUI(s) {

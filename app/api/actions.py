@@ -282,6 +282,18 @@ async def api_job_start(request: CreateJobRequest, background_tasks: BackgroundT
             status_code=status.HTTP_409_CONFLICT,
             detail="A job is already running. Cancel it before starting a new one.",
         )
+    if request.action == "label" and not request.label_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="label_id is required when action is 'label'.",
+        )
+    # Claim the slot synchronously so concurrent requests see running=True
+    # before the background task starts.
+    state.job_status["running"] = True
+    state.job_status["cancelled"] = False
+    state.job_status["done"] = False
+    state.job_status["error"] = None
+    state.job_status["message"] = "Queued..."
     filters = request.filters.model_dump() if request.filters else None
     background_tasks.add_task(
         run_job,

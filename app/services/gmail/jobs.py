@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 VALID_ACTIONS = {"search", "delete", "archive", "label", "mark_important", "find_subscriptions"}
 
+# Max message IDs stored per sender in find_subscriptions results.
+# Beyond this the sender is high-volume; domain-wide delete is more appropriate.
+_MAX_IDS_PER_SENDER = 500
+
 _BACKOFF_BASE = 2  # seconds; doubles each retry
 _BACKOFF_MAX_RETRIES = 6  # max ~64 s wait before giving up
 
@@ -89,8 +93,8 @@ def run_job(
     applying the specified action in batches of 100 (batchModify limit).
     Checks cancellation flag before each batch and between pages.
     """
-    state.reset_job()
-    state.job_status["running"] = True
+    # Slot already claimed (running=True) by the API handler before add_task().
+    # Just set the remaining fields without resetting running.
     state.job_status["action"] = action
     state.job_status["message"] = "Connecting to Gmail... (intentionally throttled to avoid API rate limits)"
 
@@ -123,7 +127,7 @@ def run_job(
                 params["q"] = query
             if mailbox:
                 params["labelIds"] = [mailbox]
-            if include_spam_trash:
+            if include_spam_trash or mailbox in ("SPAM", "TRASH"):
                 params["includeSpamTrash"] = True
             return params
 
@@ -324,7 +328,7 @@ def _run_find_subscriptions(service, query: str, mailbox: Optional[str] = None) 
         unsubscribe_data[domain]["type"] = unsub_type
         unsubscribe_data[domain]["sender"] = sender_name
         unsubscribe_data[domain]["email"] = sender_email
-        if msg_id:
+        if msg_id and len(unsubscribe_data[domain]["message_ids"]) < _MAX_IDS_PER_SENDER:
             unsubscribe_data[domain]["message_ids"].append(msg_id)
         if len(unsubscribe_data[domain]["subjects"]) < 3:
             unsubscribe_data[domain]["subjects"].append(subject)

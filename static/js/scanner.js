@@ -358,7 +358,8 @@ GmailCleaner.Scanner = {
 
         try {
             let response;
-            if (scope === 'scanned' && r.message_ids && r.message_ids.length > 0) {
+            if (scope === 'scanned') {
+                if (!r.message_ids || r.message_ids.length === 0) throw new Error('No scanned message IDs to delete');
                 response = await fetch('/api/delete-by-ids', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -463,7 +464,8 @@ GmailCleaner.Scanner = {
         for (const { r, btn } of items) {
             try {
                 let response;
-                if (scope === 'scanned' && r.message_ids && r.message_ids.length > 0) {
+                if (scope === 'scanned') {
+                    if (!r.message_ids || r.message_ids.length === 0) continue;
                     response = await fetch('/api/delete-by-ids', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -501,7 +503,11 @@ GmailCleaner.Scanner = {
             }
         }
 
-        GmailCleaner.UI.showSuccessToast(`Moved ${deleted} emails to Trash.`);
+        if (deleted > 0) {
+            GmailCleaner.UI.showSuccessToast(`Moved ${deleted} emails to Trash.`);
+        } else {
+            GmailCleaner.UI.showErrorToast('No emails were deleted.');
+        }
     },
 
     exportResults() {
