@@ -144,6 +144,12 @@ class DeleteEmailsRequest(BaseModel):
     sender: str = Field(default="", description="Sender email address")
 
 
+class DeleteByIdsRequest(BaseModel):
+    """Request to delete specific emails by message ID."""
+
+    message_ids: list[str] = Field(default=[], description="List of Gmail message IDs")
+
+
 class DeleteBulkRequest(BaseModel):
     """Request to delete emails from multiple senders."""
 

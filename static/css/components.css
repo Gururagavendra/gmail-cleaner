@@ -126,6 +126,17 @@
 .btn-danger {
     background: var(--danger-color);
     color: white;
+    border-color: var(--danger-color);
+}
+
+.btn-danger:hover {
+    background: var(--danger-hover);
+    border-color: var(--danger-hover);
+}
+
+.btn-danger {
+    background: var(--danger-color);
+    color: white;
 }
 
 .btn-danger:hover {

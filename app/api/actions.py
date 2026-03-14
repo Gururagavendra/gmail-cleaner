@@ -14,6 +14,7 @@ from app.models import (
     DeleteScanRequest,
     UnsubscribeRequest,
     DeleteEmailsRequest,
+    DeleteByIdsRequest,
     DeleteBulkRequest,
     DownloadEmailsRequest,
     CreateLabelRequest,
@@ -30,6 +31,7 @@ from app.services import (
     mark_emails_as_read,
     scan_senders_for_delete,
     delete_emails_by_sender,
+    delete_emails_by_ids,
     delete_emails_bulk_background,
     download_emails_background,
     create_label,
@@ -121,6 +123,24 @@ async def api_delete_emails(request: DeleteEmailsRequest):
         return delete_emails_by_sender(request.sender)
     except Exception as e:
         logger.exception("Error deleting emails")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete emails",
+        ) from e
+
+
+@router.post("/delete-by-ids")
+async def api_delete_by_ids(request: DeleteByIdsRequest):
+    """Delete specific emails by message ID."""
+    if not request.message_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="message_ids is required",
+        )
+    try:
+        return delete_emails_by_ids(request.message_ids)
+    except Exception as e:
+        logger.exception("Error deleting emails by ID")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete emails",

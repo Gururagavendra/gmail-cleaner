@@ -6,6 +6,7 @@ from .schemas import (
     DeleteScanRequest,
     UnsubscribeRequest,
     DeleteEmailsRequest,
+    DeleteByIdsRequest,
     DeleteBulkRequest,
     DownloadEmailsRequest,
     CreateLabelRequest,
