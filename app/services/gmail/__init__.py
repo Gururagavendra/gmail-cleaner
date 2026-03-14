@@ -68,6 +68,11 @@ from app.services.gmail.important import (
     mark_important_background,
     get_important_status,
 )
+from app.services.gmail.jobs import (
+    run_job,
+    cancel_job,
+    get_job_status,
+)
 
 # Export private helper functions with underscore-prefixed aliases for backward compatibility.
 # These are used by tests that import the original function names from this module.
@@ -101,6 +106,10 @@ __all__ = [
     # Important
     "get_important_status",
     "mark_important_background",
+    # Jobs
+    "run_job",
+    "cancel_job",
+    "get_job_status",
     # Labels
     "apply_label_to_senders_background",
     "create_label",

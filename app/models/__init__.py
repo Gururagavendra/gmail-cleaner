@@ -14,6 +14,7 @@ from .schemas import (
     RemoveLabelRequest,
     ArchiveRequest,
     MarkImportantRequest,
+    CreateJobRequest,
     StatusResponse,
     AuthStatusResponse,
     ScanStatusResponse,

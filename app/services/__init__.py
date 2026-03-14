@@ -48,4 +48,8 @@ from .gmail import (
     # Mark Important
     mark_important_background,
     get_important_status,
+    # Jobs
+    run_job,
+    cancel_job,
+    get_job_status,
 )

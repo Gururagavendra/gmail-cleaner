@@ -197,6 +197,38 @@ class MarkImportantRequest(BaseModel):
     )
 
 
+class CreateJobRequest(BaseModel):
+    """Request to create a long-running bulk email job."""
+
+    action: str = Field(
+        ...,
+        description="Action to perform: delete, archive, label, mark_important",
+    )
+    label_id: Optional[str] = Field(
+        default=None,
+        description="Gmail label ID (required for 'label' action)",
+    )
+    important: bool = Field(
+        default=True,
+        description="True to mark important, False to unmark (for 'mark_important')",
+    )
+    mailbox: Optional[str] = Field(
+        default=None,
+        description="Gmail system label to restrict to (e.g. INBOX, SENT, TRASH, SPAM)",
+    )
+    filters: Optional[FiltersModel] = Field(
+        default=None, description="Gmail filter options"
+    )
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v) -> str:
+        allowed = ["search", "delete", "archive", "label", "mark_important", "find_subscriptions"]
+        if v not in allowed:
+            raise ValueError(f"action must be one of: {allowed}")
+        return v
+
+
 # ----- Response Models -----
 
 

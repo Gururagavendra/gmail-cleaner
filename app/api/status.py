@@ -26,6 +26,7 @@ from app.services import (
     get_label_operation_status,
     get_archive_status,
     get_important_status,
+    get_job_status,
 )
 
 router = APIRouter(prefix="/api", tags=["Status"])
@@ -242,4 +243,17 @@ async def api_important_status():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get important status",
+        ) from e
+
+
+@router.get("/job/status")
+async def api_job_status():
+    """Get current long-running job status."""
+    try:
+        return get_job_status()
+    except Exception as e:
+        logger.exception("Error getting job status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get job status",
         ) from e

@@ -22,6 +22,7 @@ from app.models import (
     RemoveLabelRequest,
     ArchiveRequest,
     MarkImportantRequest,
+    CreateJobRequest,
 )
 from app.services import (
     scan_emails,
@@ -40,7 +41,10 @@ from app.services import (
     remove_label_from_senders_background,
     archive_emails_background,
     mark_important_background,
+    run_job,
+    cancel_job,
 )
+from app.core import state
 
 router = APIRouter(prefix="/api", tags=["Actions"])
 logger = logging.getLogger(__name__)
@@ -268,3 +272,36 @@ async def api_mark_important(
         partial(mark_important_background, request.senders, important=request.important)
     )
     return {"status": "started"}
+
+
+@router.post("/job/start")
+async def api_job_start(request: CreateJobRequest, background_tasks: BackgroundTasks):
+    """Start a long-running bulk email job over all matching emails."""
+    if state.job_status.get("running"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A job is already running. Cancel it before starting a new one.",
+        )
+    filters = request.filters.model_dump() if request.filters else None
+    background_tasks.add_task(
+        run_job,
+        action=request.action,
+        filters=filters,
+        label_id=request.label_id,
+        important=request.important,
+        mailbox=request.mailbox,
+    )
+    return {"status": "started"}
+
+
+@router.post("/job/cancel")
+async def api_job_cancel():
+    """Cancel the currently running job."""
+    try:
+        return cancel_job()
+    except Exception as e:
+        logger.exception("Error cancelling job")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel job",
+        ) from e
