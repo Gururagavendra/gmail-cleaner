@@ -8,6 +8,8 @@ __pycache__/
 # OAuth tokens (sensitive - user specific)
 token.json
 token.json.backup
+ai_token.json
+ai_classifications.json
 
 # Credentials (sensitive - keep secret!)
 credentials.json

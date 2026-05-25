@@ -84,6 +84,54 @@ class TestStatusEndpoints:
         # Results is a list of sender objects
         assert isinstance(data, list)
 
+    def test_get_ai_config(self, client):
+        """GET /api/ai-config should return AI config status."""
+        response = client.get("/api/ai-config")
+        assert response.status_code == 200
+        data = response.json()
+        assert "configured" in data
+        assert "providers" in data
+
+    def test_get_longtail_scan_status(self, client):
+        """GET /api/longtail/scan-status should return scan status."""
+        response = client.get("/api/longtail/scan-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "done" in data
+        assert "message" in data
+
+    def test_get_longtail_scan_results(self, client):
+        """GET /api/longtail/scan-results should return scan results."""
+        response = client.get("/api/longtail/scan-results")
+        assert response.status_code == 200
+        data = response.json()
+        assert "summary" in data
+        assert "senders" in data
+        assert "emails" in data
+
+    def test_get_longtail_classify_status(self, client):
+        """GET /api/longtail/classify-status should return AI status."""
+        response = client.get("/api/longtail/classify-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "done" in data
+        assert "message" in data
+
+    def test_get_longtail_classify_results(self, client):
+        """GET /api/longtail/classify-results should return AI results."""
+        response = client.get("/api/longtail/classify-results")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+
+    def test_get_longtail_apply_status(self, client):
+        """GET /api/longtail/apply-status should return apply status."""
+        response = client.get("/api/longtail/apply-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "done" in data
+        assert "message" in data
+
 
 class TestDocsEndpoints:
     """Tests for API documentation endpoints."""

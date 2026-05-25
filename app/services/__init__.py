@@ -48,3 +48,18 @@ from .gmail import (
     mark_important_background,
     get_important_status,
 )
+
+from .ai_longtail import (
+    get_ai_config_status,
+    save_ai_config,
+    classify_one_long_tail_email,
+    scan_long_tail_candidates,
+    get_long_tail_scan_status,
+    get_long_tail_scan_results,
+    classify_long_tail_candidates_background,
+    cancel_long_tail_classification,
+    get_long_tail_classify_status,
+    get_long_tail_classify_results,
+    apply_long_tail_actions_background,
+    get_long_tail_apply_status,
+)

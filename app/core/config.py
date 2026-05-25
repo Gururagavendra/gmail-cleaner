@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     app_name: str = "Gmail Cleaner"
     app_version: str = "1.0.0"
     debug: bool = False
+    reload: bool = False
     port: int = 8766
     oauth_port: int = 8767
     oauth_external_port: int | None = Field(
@@ -44,8 +45,32 @@ class Settings(BaseSettings):
             return normalized in ("true", "1", "yes", "on")
         return bool(v)
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def validate_debug(cls, v) -> bool:
+        """Convert debug environment values to boolean safely."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            normalized = v.lower().strip()
+            return normalized in ("true", "1", "yes", "on", "debug")
+        return bool(v)
+
+    @field_validator("reload", mode="before")
+    @classmethod
+    def validate_reload(cls, v) -> bool:
+        """Convert reload environment values to boolean safely."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            normalized = v.lower().strip()
+            return normalized in ("true", "1", "yes", "on", "reload")
+        return bool(v)
+
     credentials_file: str = "credentials.json"
     token_file: str = "token.json"
+    ai_token_file: str = "ai_token.json"
+    ai_classification_cache_file: str = "ai_classifications.json"
 
     def __init__(self, **kwargs):
         """Initialize settings and auto-detect data directory for token persistence."""
@@ -93,6 +118,38 @@ class Settings(BaseSettings):
                 else:
                     # Safe path - use resolved path (file, not directory)
                     self.token_file = resolved_path
+
+            self.ai_token_file = self._resolve_data_file_path(
+                self.ai_token_file, "ai_token.json", base_dir
+            )
+            self.ai_classification_cache_file = self._resolve_data_file_path(
+                self.ai_classification_cache_file,
+                "ai_classifications.json",
+                base_dir,
+            )
+
+    def _resolve_data_file_path(
+        self, file_path: str, fallback_name: str, base_dir: str
+    ) -> str:
+        """Resolve a data file path safely inside the Docker data directory."""
+        if os.path.isabs(file_path):
+            resolved_path = os.path.abspath(os.path.realpath(file_path))
+        else:
+            resolved_path = os.path.abspath(
+                os.path.realpath(os.path.join(base_dir, file_path))
+            )
+
+        if (
+            not resolved_path.startswith(base_dir + os.sep)
+            or resolved_path == base_dir
+            or os.path.isdir(resolved_path)
+        ):
+            name = os.path.basename(file_path)
+            if name in ("", "."):
+                name = fallback_name
+            return os.path.join(base_dir, name)
+
+        return resolved_path
 
     # Gmail API
     scopes: list[str] = [

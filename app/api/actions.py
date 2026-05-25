@@ -21,6 +21,11 @@ from app.models import (
     RemoveLabelRequest,
     ArchiveRequest,
     MarkImportantRequest,
+    AIConfigRequest,
+    LongTailClassifyRequest,
+    LongTailScanRequest,
+    LongTailClassifyCandidatesRequest,
+    LongTailApplyActionsRequest,
 )
 from app.services import (
     scan_emails,
@@ -38,6 +43,12 @@ from app.services import (
     remove_label_from_senders_background,
     archive_emails_background,
     mark_important_background,
+    save_ai_config,
+    classify_one_long_tail_email,
+    scan_long_tail_candidates,
+    classify_long_tail_candidates_background,
+    cancel_long_tail_classification,
+    apply_long_tail_actions_background,
 )
 
 router = APIRouter(prefix="/api", tags=["Actions"])
@@ -246,5 +257,96 @@ async def api_mark_important(
         )
     background_tasks.add_task(
         partial(mark_important_background, request.senders, important=request.important)
+    )
+    return {"status": "started"}
+
+
+@router.post("/ai-config")
+async def api_save_ai_config(request: AIConfigRequest):
+    """Save local AI provider credentials."""
+    try:
+        return save_ai_config(
+            request.provider,
+            request.api_key,
+            request.model,
+            request.base_url,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.exception("Error saving AI config")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save AI config",
+        ) from e
+
+
+@router.post("/longtail/classify-one")
+async def api_longtail_classify_one(request: LongTailClassifyRequest):
+    """Classify one inbox email using the configured AI provider."""
+    filters_dict = (
+        request.filters.model_dump(exclude_none=True) if request.filters else None
+    )
+    result = classify_one_long_tail_email(filters_dict, request.sender)
+    if not result.get("success") and result.get("error"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result["error"],
+        )
+    return result
+
+
+@router.post("/longtail/scan")
+async def api_longtail_scan(
+    request: LongTailScanRequest, background_tasks: BackgroundTasks
+):
+    """Scan inbox emails for long-tail sender candidates."""
+    filters_dict = (
+        request.filters.model_dump(exclude_none=True) if request.filters else None
+    )
+    background_tasks.add_task(
+        scan_long_tail_candidates,
+        request.limit,
+        request.sender_threshold,
+        filters_dict,
+    )
+    return {"status": "started"}
+
+
+@router.post("/longtail/classify-candidates")
+async def api_longtail_classify_candidates(
+    request: LongTailClassifyCandidatesRequest, background_tasks: BackgroundTasks
+):
+    """Classify scanned long-tail candidate emails."""
+    background_tasks.add_task(
+        classify_long_tail_candidates_background,
+        request.max_emails,
+        request.use_cache,
+    )
+    return {"status": "started"}
+
+
+@router.post("/longtail/cancel-classification")
+async def api_longtail_cancel_classification():
+    """Cancel active long-tail AI classification."""
+    return cancel_long_tail_classification()
+
+
+@router.post("/longtail/apply-actions")
+async def api_longtail_apply_actions(
+    request: LongTailApplyActionsRequest, background_tasks: BackgroundTasks
+):
+    """Apply reviewed long-tail delete/archive actions."""
+    if not request.actions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one action is required",
+        )
+    background_tasks.add_task(
+        apply_long_tail_actions_background,
+        [action.model_dump() for action in request.actions],
     )
     return {"status": "started"}

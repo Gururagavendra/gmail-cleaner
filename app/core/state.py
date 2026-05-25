@@ -102,6 +102,41 @@ class AppState:
             "current_sender": 0,
         }
 
+        # Long-tail AI state
+        self.long_tail_scan_results: dict = {
+            "summary": {},
+            "senders": [],
+            "emails": [],
+        }
+        self.long_tail_scan_status: dict = {
+            "progress": 0,
+            "message": "Ready",
+            "done": False,
+            "error": None,
+        }
+        self.long_tail_classify_results: list = []
+        self.long_tail_classify_status: dict = {
+            "progress": 0,
+            "message": "Ready",
+            "done": False,
+            "error": None,
+            "classified_count": 0,
+            "cached_count": 0,
+            "error_count": 0,
+            "skipped_count": 0,
+            "total_emails": 0,
+        }
+        self.long_tail_cancel_requested: bool = False
+        self.long_tail_apply_status: dict = {
+            "progress": 0,
+            "message": "Ready",
+            "done": False,
+            "error": None,
+            "trashed_count": 0,
+            "archived_count": 0,
+            "total_emails": 0,
+        }
+
     def reset_scan(self):
         """Reset scan state."""
         self.scan_results = []
@@ -190,6 +225,50 @@ class AppState:
             "affected_count": 0,
             "total_senders": 0,
             "current_sender": 0,
+        }
+
+    def reset_long_tail_scan(self):
+        """Reset long-tail scan state."""
+        self.long_tail_scan_results = {
+            "summary": {},
+            "senders": [],
+            "emails": [],
+        }
+        self.long_tail_scan_status = {
+            "progress": 0,
+            "message": "Ready",
+            "done": False,
+            "error": None,
+        }
+        self.reset_long_tail_classify()
+
+    def reset_long_tail_classify(self):
+        """Reset long-tail AI classification state."""
+        self.long_tail_classify_results = []
+        self.long_tail_cancel_requested = False
+        self.long_tail_classify_status = {
+            "progress": 0,
+            "message": "Ready",
+            "done": False,
+            "error": None,
+            "classified_count": 0,
+            "cached_count": 0,
+            "error_count": 0,
+            "skipped_count": 0,
+            "total_emails": 0,
+        }
+        self.reset_long_tail_apply()
+
+    def reset_long_tail_apply(self):
+        """Reset long-tail apply action state."""
+        self.long_tail_apply_status = {
+            "progress": 0,
+            "message": "Ready",
+            "done": False,
+            "error": None,
+            "trashed_count": 0,
+            "archived_count": 0,
+            "total_emails": 0,
         }
 
 

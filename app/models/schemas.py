@@ -191,6 +191,93 @@ class MarkImportantRequest(BaseModel):
     )
 
 
+class AIConfigRequest(BaseModel):
+    """Request to save local AI provider credentials."""
+
+    provider: str = Field(..., min_length=1, max_length=50)
+    api_key: str = Field(..., min_length=1, max_length=500)
+    model: str = Field(..., min_length=1, max_length=100)
+    base_url: str = Field(..., min_length=1, max_length=300)
+
+
+class LongTailClassifyRequest(BaseModel):
+    """Request to classify one inbox email with AI."""
+
+    filters: Optional[FiltersModel] = Field(
+        default=None, description="Gmail filter options"
+    )
+    sender: Optional[str] = Field(
+        default=None,
+        description="Sender email address or domain to classify from",
+    )
+
+    @field_validator("sender")
+    @classmethod
+    def validate_sender(cls, v) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        sender = v.strip()
+        if not sender:
+            return None
+        if "@" not in sender and "." not in sender:
+            raise ValueError("sender must be a valid email address or domain")
+        return sender
+
+
+class LongTailScanRequest(BaseModel):
+    """Request to scan inbox emails for long-tail sender candidates."""
+
+    limit: int = Field(default=1000, ge=1, le=5000, description="Max inbox emails to scan")
+    sender_threshold: int = Field(
+        default=2,
+        ge=1,
+        le=25,
+        description="Include only senders with this many emails or fewer",
+    )
+    filters: Optional[FiltersModel] = Field(
+        default=None, description="Gmail filter options"
+    )
+
+
+class LongTailClassifyCandidatesRequest(BaseModel):
+    """Request to classify scanned long-tail candidates."""
+
+    max_emails: int = Field(
+        default=25,
+        ge=1,
+        le=500,
+        description="Maximum candidate emails to classify in this run",
+    )
+    use_cache: bool = Field(
+        default=True,
+        description="Use cached classifications and skip repeat AI calls",
+    )
+
+
+class LongTailActionItem(BaseModel):
+    """A single reviewed long-tail action to apply."""
+
+    message_id: str = Field(..., min_length=1, max_length=200)
+    action: str = Field(..., description="Action to apply: delete or archive")
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v) -> str:
+        action = v.strip().lower()
+        if action not in ("delete", "archive"):
+            raise ValueError("action must be delete or archive")
+        return action
+
+
+class LongTailApplyActionsRequest(BaseModel):
+    """Request to apply reviewed long-tail Gmail actions."""
+
+    actions: list[LongTailActionItem] = Field(
+        default=[],
+        description="Reviewed message actions to apply",
+    )
+
+
 # ----- Response Models -----
 
 

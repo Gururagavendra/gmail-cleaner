@@ -70,6 +70,12 @@
                         </svg>
                         <span>Mark as Read</span>
                     </a>
+                    <a href="#" class="nav-item" data-view="longtail">
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="currentColor" d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/>
+                        </svg>
+                        <span>Long tail</span>
+                    </a>
                 </nav>
 
                 <div class="sidebar-footer">
@@ -327,6 +333,154 @@
                     </div>
                 </div>
 
+                <!-- Long Tail View -->
+                <div class="view hidden" id="longtailView">
+                    <div class="content-header">
+                        <h1>Long tail</h1>
+                        <p>Find low-volume senders and use AI to identify safe inbox cleanup actions</p>
+                    </div>
+
+                    <div class="info-note">
+                        <svg viewBox="0 0 24 24" width="18" height="18">
+                            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                        <span>Scan recent inbox mail for low-volume senders, classify the candidates with your chosen AI provider, then review and apply recommended archive or delete actions.</span>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>AI Settings</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="config-status status-warning" id="aiConfigStatus">Checking AI settings...</p>
+                            <div class="ai-settings-grid">
+                                <div class="form-group">
+                                    <label for="aiProvider">Provider</label>
+                                    <select id="aiProvider" class="form-select" onchange="GmailCleaner.LongTail.applyProviderDefaults(true)"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="aiApiKey">API token</label>
+                                    <input type="password" id="aiApiKey" class="form-input" placeholder="Paste provider token">
+                                </div>
+                                <div class="form-group">
+                                    <label for="aiModel">Model</label>
+                                    <input type="text" id="aiModel" class="form-input" placeholder="gpt-4.1-mini">
+                                </div>
+                                <div class="form-group">
+                                    <label for="aiBaseUrl">Base URL</label>
+                                    <input type="url" id="aiBaseUrl" class="form-input" placeholder="https://api.openai.com/v1">
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" onclick="saveAIConfig()">Save AI Settings</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Long-tail Scan</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="scan-row">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="longTailScanLimit">Emails to scan</label>
+                                    <select id="longTailScanLimit" class="form-select">
+                                        <option value="500">500</option>
+                                        <option value="1000" selected>1000</option>
+                                        <option value="2000">2000</option>
+                                        <option value="5000">5000</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="longTailSenderThreshold">Sender threshold</label>
+                                    <input type="number" id="longTailSenderThreshold" class="form-input threshold-input" value="2" min="1" max="25">
+                                </div>
+                                <button class="btn btn-primary" id="longTailBulkScanBtn" onclick="scanLongTailBulk()">
+                                    <svg viewBox="0 0 24 24" width="18" height="18">
+                                        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                    </svg>
+                                    Scan Long-tail
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card hidden" id="longTailBulkProgressCard">
+                        <div class="card-body">
+                            <div class="progress-container">
+                                <div class="progress-bar" id="longTailBulkProgressBar"></div>
+                            </div>
+                            <p class="progress-text" id="longTailBulkProgressText">Starting...</p>
+                        </div>
+                    </div>
+
+                    <div class="hidden" id="longTailBulkSummarySection">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <span class="results-count" id="longTailBulkSummary">No scan yet</span>
+                            </div>
+                            <div class="toolbar-right">
+                                <select id="longTailClassifyLimit" class="form-select">
+                                    <option value="10">Classify 10</option>
+                                    <option value="25" selected>Classify 25</option>
+                                    <option value="50">Classify 50</option>
+                                    <option value="100">Classify 100</option>
+                                    <option value="250">Classify 250</option>
+                                </select>
+                                <button class="btn btn-primary" id="longTailClassifyCandidatesBtn" onclick="classifyLongTailCandidates()" disabled>
+                                    Classify Candidates
+                                </button>
+                            </div>
+                        </div>
+                        <div class="longtail-estimate" id="longTailTokenEstimate"></div>
+                        <div class="card hidden" id="longTailClassifyProgressCard">
+                            <div class="card-body">
+                                <div class="progress-container">
+                                    <div class="progress-bar" id="longTailClassifyProgressBar"></div>
+                                </div>
+                                <p class="progress-text" id="longTailClassifyProgressText">Starting...</p>
+                            </div>
+                        </div>
+                        <div class="hidden" id="longTailClassifyResultsSection">
+                            <div class="toolbar">
+                                <div class="toolbar-left">
+                                    <span class="results-count"><span id="longTailClassifyBadge">0</span> AI results</span>
+                                </div>
+                                <div class="toolbar-right">
+                                    <button class="btn btn-secondary" id="longTailSelectRecommendedBtn" onclick="selectRecommendedLongTailActions()" disabled>
+                                        Select Recommended
+                                    </button>
+                                    <button class="btn btn-primary" id="longTailApplyActionsBtn" onclick="applyLongTailActions()" disabled>
+                                        Apply Selected
+                                    </button>
+                                    <button class="btn btn-secondary" id="longTailCancelClassifyBtn" onclick="cancelLongTailClassification()" disabled>
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card hidden" id="longTailApplyProgressCard">
+                                <div class="card-body">
+                                    <div class="progress-container">
+                                        <div class="progress-bar" id="longTailApplyProgressBar"></div>
+                                    </div>
+                                    <p class="progress-text" id="longTailApplyProgressText">Starting...</p>
+                                </div>
+                            </div>
+                            <div class="results-list" id="longTailClassifyResultsList"></div>
+                        </div>
+                        <div class="results-list" id="longTailCandidateList"></div>
+                    </div>
+
+                    <div class="empty-state" id="longTailNoResult">
+                        <div class="empty-icon">
+                            <svg viewBox="0 0 24 24" width="80" height="80">
+                                <path fill="#dadce0" d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                            </svg>
+                        </div>
+                        <h2>Scan for long-tail cleanup candidates</h2>
+                        <p>Start with a sender threshold, classify the candidates, then review recommendations before applying changes.</p>
+                    </div>
+                </div>
+
                 <!-- Delete Emails View -->
                 <div class="view hidden" id="deleteView">
                     <div class="content-header">
@@ -468,6 +622,7 @@
     <script src="/static/js/markread.js?v={{ cache_bust }}"></script>
     <script src="/static/js/delete.js?v={{ cache_bust }}"></script>
     <script src="/static/js/labels.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/longtail.js?v={{ cache_bust }}"></script>
     <!-- Litepicker Date Range Picker Library -->
     <script src="https://cdn.jsdelivr.net/npm/litepicker@latest/dist/litepicker.js"></script>
 </body>

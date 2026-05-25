@@ -53,6 +53,10 @@ GmailCleaner.UI = {
         if (viewName === 'markread') {
             GmailCleaner.MarkRead.refreshUnreadCount();
         }
+
+        if (viewName === 'longtail') {
+            GmailCleaner.LongTail.loadConfig();
+        }
     },
 
     escapeHtml(text) {

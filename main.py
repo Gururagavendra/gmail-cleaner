@@ -17,7 +17,6 @@ import threading
 import uvicorn
 
 from app.core import settings
-from app.main import app
 
 
 def main():
@@ -47,6 +46,8 @@ def main():
 
     print(f"\nOpening browser at: http://localhost:{port}")
     print("   (Keep this terminal open)")
+    if settings.reload:
+        print("   Auto-reload enabled: refresh the browser after code changes")
     print("\n   Press Ctrl+C to stop\n")
 
     # Only open browser if running locally (not in cloud)
@@ -56,7 +57,13 @@ def main():
         ).start()
 
     # Start FastAPI with Uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=port,
+        log_level="warning",
+        reload=settings.reload,
+    )
 
 
 if __name__ == "__main__":

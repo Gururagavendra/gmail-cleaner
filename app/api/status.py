@@ -26,6 +26,12 @@ from app.services import (
     get_label_operation_status,
     get_archive_status,
     get_important_status,
+    get_ai_config_status,
+    get_long_tail_scan_status,
+    get_long_tail_scan_results,
+    get_long_tail_classify_status,
+    get_long_tail_classify_results,
+    get_long_tail_apply_status,
 )
 
 router = APIRouter(prefix="/api", tags=["Status"])
@@ -242,4 +248,82 @@ async def api_important_status():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get important status",
+        ) from e
+
+
+@router.get("/ai-config")
+async def api_ai_config():
+    """Get local AI provider configuration status."""
+    try:
+        return get_ai_config_status()
+    except Exception as e:
+        logger.exception("Error getting AI config status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get AI config status",
+        ) from e
+
+
+@router.get("/longtail/scan-status")
+async def api_longtail_scan_status():
+    """Get long-tail sender scan status."""
+    try:
+        return get_long_tail_scan_status()
+    except Exception as e:
+        logger.exception("Error getting long-tail scan status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get long-tail scan status",
+        ) from e
+
+
+@router.get("/longtail/scan-results")
+async def api_longtail_scan_results():
+    """Get long-tail sender scan results."""
+    try:
+        return get_long_tail_scan_results()
+    except Exception as e:
+        logger.exception("Error getting long-tail scan results")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get long-tail scan results",
+        ) from e
+
+
+@router.get("/longtail/classify-status")
+async def api_longtail_classify_status():
+    """Get long-tail AI classification status."""
+    try:
+        return get_long_tail_classify_status()
+    except Exception as e:
+        logger.exception("Error getting long-tail classification status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get long-tail classification status",
+        ) from e
+
+
+@router.get("/longtail/classify-results")
+async def api_longtail_classify_results():
+    """Get long-tail AI classification results."""
+    try:
+        return get_long_tail_classify_results()
+    except Exception as e:
+        logger.exception("Error getting long-tail classification results")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get long-tail classification results",
+        ) from e
+
+
+@router.get("/longtail/apply-status")
+async def api_longtail_apply_status():
+    """Get long-tail apply action status."""
+    try:
+        return get_long_tail_apply_status()
+    except Exception as e:
+        logger.exception("Error getting long-tail apply status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get long-tail apply status",
         ) from e

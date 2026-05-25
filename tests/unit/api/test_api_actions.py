@@ -191,6 +191,129 @@ class TestDeleteBulkEndpoint:
         mock_delete.assert_called_once_with([])
 
 
+class TestAIConfigEndpoint:
+    """Tests for POST /api/ai-config endpoint."""
+
+    @patch("app.api.actions.save_ai_config")
+    def test_save_ai_config(self, mock_save, client):
+        """POST /api/ai-config should save local AI settings."""
+        mock_save.return_value = {"configured": True, "provider": "openai"}
+        response = client.post(
+            "/api/ai-config",
+            json={
+                "provider": "openai",
+                "api_key": "test-token",
+                "model": "gpt-4.1-mini",
+                "base_url": "https://api.openai.com/v1",
+            },
+        )
+        assert response.status_code == 200
+        mock_save.assert_called_once_with(
+            "openai",
+            "test-token",
+            "gpt-4.1-mini",
+            "https://api.openai.com/v1",
+        )
+
+
+class TestLongTailEndpoint:
+    """Tests for POST /api/longtail/classify-one endpoint."""
+
+    @patch("app.api.actions.classify_one_long_tail_email")
+    def test_classify_one_long_tail_email(self, mock_classify, client):
+        """POST /api/longtail/classify-one should classify one email."""
+        mock_classify.return_value = {
+            "success": True,
+            "email": None,
+            "classification": None,
+        }
+        response = client.post("/api/longtail/classify-one", json={})
+        assert response.status_code == 200
+        mock_classify.assert_called_once_with(None, None)
+
+    @patch("app.api.actions.classify_one_long_tail_email")
+    def test_classify_one_long_tail_email_by_sender(self, mock_classify, client):
+        """POST /api/longtail/classify-one should accept a sender filter."""
+        mock_classify.return_value = {
+            "success": True,
+            "email": None,
+            "classification": None,
+        }
+        response = client.post(
+            "/api/longtail/classify-one",
+            json={"sender": "newsletter@example.com"},
+        )
+        assert response.status_code == 200
+        mock_classify.assert_called_once_with(None, "newsletter@example.com")
+
+    @patch("app.api.actions.scan_long_tail_candidates")
+    def test_scan_long_tail_candidates(self, mock_scan, client):
+        """POST /api/longtail/scan should start candidate scan."""
+        response = client.post(
+            "/api/longtail/scan",
+            json={"limit": 500, "sender_threshold": 2},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"status": "started"}
+        mock_scan.assert_called_once_with(500, 2, None)
+
+    @patch("app.api.actions.classify_long_tail_candidates_background")
+    def test_classify_long_tail_candidates(self, mock_classify, client):
+        """POST /api/longtail/classify-candidates should start AI classification."""
+        response = client.post(
+            "/api/longtail/classify-candidates",
+            json={"max_emails": 10, "use_cache": True},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"status": "started"}
+        mock_classify.assert_called_once_with(10, True)
+
+    def test_classify_long_tail_candidates_defaults(self, client):
+        """POST /api/longtail/classify-candidates should default to a safe cap."""
+        with patch("app.api.actions.classify_long_tail_candidates_background") as mock:
+            response = client.post("/api/longtail/classify-candidates", json={})
+            assert response.status_code == 200
+            mock.assert_called_once_with(25, True)
+
+    @patch("app.api.actions.cancel_long_tail_classification")
+    def test_cancel_long_tail_classification(self, mock_cancel, client):
+        """POST /api/longtail/cancel-classification should request cancellation."""
+        mock_cancel.return_value = {"status": "cancelling"}
+        response = client.post("/api/longtail/cancel-classification")
+        assert response.status_code == 200
+        assert response.json() == {"status": "cancelling"}
+        mock_cancel.assert_called_once_with()
+
+    @patch("app.api.actions.apply_long_tail_actions_background")
+    def test_apply_long_tail_actions(self, mock_apply, client):
+        """POST /api/longtail/apply-actions should start reviewed actions."""
+        response = client.post(
+            "/api/longtail/apply-actions",
+            json={
+                "actions": [
+                    {"message_id": "msg-1", "action": "delete"},
+                    {"message_id": "msg-2", "action": "archive"},
+                ]
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == {"status": "started"}
+        mock_apply.assert_called_once_with(
+            [
+                {"message_id": "msg-1", "action": "delete"},
+                {"message_id": "msg-2", "action": "archive"},
+            ]
+        )
+
+    def test_apply_long_tail_actions_rejects_keep(self, client):
+        """POST /api/longtail/apply-actions should reject non-actionable actions."""
+        response = client.post(
+            "/api/longtail/apply-actions",
+            json={"actions": [{"message_id": "msg-1", "action": "keep_in_inbox"}]},
+        )
+        assert response.status_code == 422
+
+
 class TestRequestValidation:
     """Tests for request validation across endpoints."""
 

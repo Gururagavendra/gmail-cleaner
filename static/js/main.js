@@ -7,8 +7,15 @@
 window.GmailCleaner = {
     results: [],
     deleteResults: [],
+    longTailResult: null,
+    longTailScanResults: null,
+    longTailClassifyResults: [],
     scanning: false,
     deleteScanning: false,
+    longTailScanning: false,
+    longTailBulkScanning: false,
+    longTailClassifying: false,
+    longTailApplying: false,
     currentView: 'login'
 };
 
@@ -18,4 +25,5 @@ document.addEventListener('DOMContentLoaded', () => {
     GmailCleaner.Auth.checkWebAuthMode();
     GmailCleaner.UI.setupNavigation();
     GmailCleaner.Filters.setup();
+    GmailCleaner.LongTail.init();
 });
