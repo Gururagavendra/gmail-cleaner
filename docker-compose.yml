@@ -7,9 +7,12 @@ services:
     # Option 2: Build locally (uncomment below, comment out image above)
     # build: .
 
+    # Published ports are bound to host loopback only, so the API is not exposed
+    # to the local network by default. To reach it from other machines, drop the
+    # "127.0.0.1:" prefix AND set API_TOKEN below (see environment).
     ports:
-      - "8766:8766"  # Web UI
-      - "8767:8767"  # OAuth callback
+      - "127.0.0.1:8766:8766"  # Web UI
+      - "127.0.0.1:8767:8767"  # OAuth callback
     volumes:
       - type: bind
         source: ./credentials.json
@@ -27,6 +30,11 @@ services:
           create_host_path: true
     environment:
       - WEB_AUTH=true
+
+      # API authentication: the container binds 0.0.0.0 internally, so the API
+      # requires a token. Pin a stable secret here; if left unset a random token
+      # is generated on each start and printed to the container logs.
+      # - API_TOKEN=change-me-to-a-long-random-secret
 
       # Uncomment and set OAUTH_HOST if accessing via custom domain or server IP
       # - OAUTH_HOST=gmail.example.com
