@@ -160,7 +160,7 @@ class TestDeleteEmailsEndpoint:
             "/api/delete-emails", json={"sender": "newsletter@example.com"}
         )
         assert response.status_code == 200
-        mock_delete.assert_called_once_with("newsletter@example.com")
+        mock_delete.assert_called_once_with("newsletter@example.com", "inbox")
 
 
 class TestDeleteBulkEndpoint:
@@ -173,7 +173,7 @@ class TestDeleteBulkEndpoint:
         response = client.post("/api/delete-emails-bulk", json={"senders": senders})
         assert response.status_code == 200
         assert response.json() == {"status": "started"}
-        mock_delete.assert_called_once_with(senders)
+        mock_delete.assert_called_once_with(senders, "inbox")
 
     def test_delete_bulk_large_senders_list(self, client):
         """POST /api/delete-emails-bulk with many senders should succeed (no limit)."""
@@ -188,7 +188,7 @@ class TestDeleteBulkEndpoint:
         response = client.post("/api/delete-emails-bulk", json={"senders": []})
         assert response.status_code == 200
         assert response.json() == {"status": "started"}
-        mock_delete.assert_called_once_with([])
+        mock_delete.assert_called_once_with([], "inbox")
 
 
 class TestAIConfigEndpoint:

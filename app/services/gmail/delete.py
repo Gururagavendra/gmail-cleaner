@@ -17,6 +17,26 @@ from app.services.gmail.helpers import build_gmail_query, get_sender_info, get_s
 logger = logging.getLogger(__name__)
 
 
+def _get_mail_scope(filters: Optional[dict] = None) -> str:
+    if not filters:
+        return "inbox"
+    return "all" if filters.get("mail_scope") == "all" else "inbox"
+
+
+def _build_scoped_query(query: str = "", mail_scope: str = "inbox") -> str:
+    """Build a Gmail search query for the selected mail scope."""
+    query = (query or "").strip()
+    if mail_scope == "all":
+        return query
+    if not query:
+        return "in:inbox"
+    return f"in:inbox {query}"
+
+
+def _list_params_for_scope(mail_scope: str) -> dict:
+    return {"labelIds": ["INBOX"]} if mail_scope == "inbox" else {}
+
+
 def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
     """Scan emails and group by sender for bulk delete."""
     # Validate input
@@ -38,12 +58,19 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
     try:
         state.delete_scan_status["message"] = "Fetching emails..."
 
-        query = build_gmail_query(filters)
+        mail_scope = _get_mail_scope(filters)
+        query = _build_scoped_query(build_gmail_query(filters), mail_scope)
+        scope_params = _list_params_for_scope(mail_scope)
 
         results = (
             service.users()
             .messages()
-            .list(userId="me", maxResults=min(limit, 500), q=query or None)
+            .list(
+                userId="me",
+                maxResults=min(limit, 500),
+                q=query or None,
+                **scope_params,
+            )
             .execute()
         )
 
@@ -58,6 +85,7 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
                     maxResults=min(limit - len(messages), 500),
                     pageToken=results["nextPageToken"],
                     q=query or None,
+                    **scope_params,
                 )
                 .execute()
             )
@@ -87,15 +115,9 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
             }
         )
         processed = 0
-        batch_size = 100
+        batch_size = 25
 
-        def process_message(request_id, response, exception) -> None:
-            nonlocal processed
-            processed += 1
-
-            if exception:
-                return
-
+        def process_message_response(response) -> None:
             headers = response.get("payload", {}).get("headers", [])
             sender_name, sender_email = get_sender_info(headers)
             subject = get_subject(headers)
@@ -124,9 +146,47 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
                         sender_counts[sender_email]["first_date"] = email_date
                     sender_counts[sender_email]["last_date"] = email_date
 
+        def retry_message_get(msg_id: str) -> None:
+            nonlocal processed
+
+            for attempt in range(3):
+                try:
+                    if attempt > 0:
+                        time.sleep(0.5 * attempt)
+                    response = (
+                        service.users()
+                        .messages()
+                        .get(
+                            userId="me",
+                            id=msg_id,
+                            format="metadata",
+                            metadataHeaders=["From", "Subject", "Date"],
+                        )
+                        .execute()
+                    )
+                    process_message_response(response)
+                    processed += 1
+                    return
+                except Exception as e:
+                    if attempt == 2:
+                        logger.warning("Failed to fetch message %s: %s", msg_id, e)
+            processed += 1
+
         # Execute batch requests
         for i in range(0, len(messages), batch_size):
             batch_ids = messages[i : i + batch_size]
+            failed_ids = []
+
+            def process_message(request_id, response, exception) -> None:
+                nonlocal processed
+
+                if exception:
+                    failed_ids.append(request_id)
+                    return
+
+                process_message_response(response)
+                processed += 1
+
             batch = service.new_batch_http_request(callback=process_message)
 
             for msg_data in batch_ids:
@@ -139,9 +199,14 @@ def scan_senders_for_delete(limit: int = 1000, filters: Optional[dict] = None):
                         format="metadata",
                         metadataHeaders=["From", "Subject", "Date"],
                     )
+                    ,
+                    request_id=msg_data["id"],
                 )
 
             batch.execute()
+
+            for msg_id in failed_ids:
+                retry_message_get(msg_id)
 
             progress = int((i + len(batch_ids)) / total * 100)
             state.delete_scan_status["progress"] = progress
@@ -177,7 +242,7 @@ def get_delete_scan_results() -> list:
     return state.delete_scan_results.copy()
 
 
-def delete_emails_by_sender(sender: str) -> dict:
+def delete_emails_by_sender(sender: str, mail_scope: str = "inbox") -> dict:
     """Delete all emails from a specific sender."""
     if not sender or not sender.strip():
         return {
@@ -215,11 +280,13 @@ def delete_emails_by_sender(sender: str) -> dict:
 
     try:
         # Find all emails from sender
-        query = f"from:{sender}"
+        mail_scope = "all" if mail_scope == "all" else "inbox"
+        query = _build_scoped_query(f"from:{sender}", mail_scope)
+        scope_params = _list_params_for_scope(mail_scope)
         results = (
             service.users()
             .messages()
-            .list(userId="me", q=query, maxResults=500)
+            .list(userId="me", q=query or None, maxResults=500, **scope_params)
             .execute()
         )
         messages = results.get("messages", [])
@@ -233,6 +300,7 @@ def delete_emails_by_sender(sender: str) -> dict:
                     q=query,
                     maxResults=500,
                     pageToken=results["nextPageToken"],
+                    **scope_params,
                 )
                 .execute()
             )
@@ -274,7 +342,7 @@ def delete_emails_by_sender(sender: str) -> dict:
         return {"success": False, "deleted": 0, "size_freed": 0, "message": str(e)}
 
 
-def delete_emails_bulk(senders: list[str]) -> dict:
+def delete_emails_bulk(senders: list[str], mail_scope: str = "inbox") -> dict:
     """Delete emails from multiple senders."""
     if not senders:
         return {
@@ -289,7 +357,7 @@ def delete_emails_bulk(senders: list[str]) -> dict:
     errors = []
 
     for sender in senders:
-        result = delete_emails_by_sender(sender)
+        result = delete_emails_by_sender(sender, mail_scope)
         if result["success"]:
             total_deleted += result["deleted"]
             total_size_freed += result.get("size_freed", 0)
@@ -321,7 +389,7 @@ def delete_emails_bulk(senders: list[str]) -> dict:
     }
 
 
-def delete_emails_bulk_background(senders: list[str]) -> None:
+def delete_emails_bulk_background(senders: list[str], mail_scope: str = "inbox") -> None:
     """Delete emails from multiple senders with progress updates (background task).
 
     Optimized to collect all message IDs first, then batch delete in larger chunks.
@@ -347,6 +415,8 @@ def delete_emails_bulk_background(senders: list[str]) -> None:
     # Phase 1: Collect all message IDs from all senders
     all_message_ids = []
     errors = []
+    mail_scope = "all" if mail_scope == "all" else "inbox"
+    scope_params = _list_params_for_scope(mail_scope)
 
     for i, sender in enumerate(senders):
         state.delete_bulk_status["current_sender"] = i + 1
@@ -356,11 +426,11 @@ def delete_emails_bulk_background(senders: list[str]) -> None:
         state.delete_bulk_status["message"] = f"Finding emails from {sender}..."
 
         try:
-            query = f"from:{sender}"
+            query = _build_scoped_query(f"from:{sender}", mail_scope)
             results = (
                 service.users()
                 .messages()
-                .list(userId="me", q=query, maxResults=500)
+                .list(userId="me", q=query or None, maxResults=500, **scope_params)
                 .execute()
             )
             messages = results.get("messages", [])
@@ -374,6 +444,7 @@ def delete_emails_bulk_background(senders: list[str]) -> None:
                         q=query,
                         maxResults=500,
                         pageToken=results["nextPageToken"],
+                        **scope_params,
                     )
                     .execute()
                 )
