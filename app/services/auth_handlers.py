@@ -58,8 +58,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         query_params = parse_qs(parsed_url.query)
 
         # Verify OAuth state for CSRF protection
-        with state.oauth_state_lock:
-            stored_state = state.oauth_state.get("state")
+        stored_state = state.get_oauth_state().get("state")
         incoming_state = None
         if "state" in query_params:
             state_list = query_params["state"]
@@ -76,8 +75,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                     "OAuth callback received but no stored state found - possible CSRF attack or state expired"
                 )
                 # Clear state on security error
-                with state.oauth_state_lock:
-                    state.oauth_state["state"] = None
+                state.set_oauth_state(None)
                 self.callback_event.set()
             self.send_response(403)
             self.send_header("Content-type", "text/html")
@@ -96,8 +94,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                     "OAuth callback missing state parameter - possible CSRF attack or malformed request"
                 )
                 # Clear state on security error
-                with state.oauth_state_lock:
-                    state.oauth_state["state"] = None
+                state.set_oauth_state(None)
                 self.callback_event.set()
             self.send_response(403)
             self.send_header("Content-type", "text/html")
@@ -119,8 +116,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                     "OAuth state mismatch - possible CSRF attack"
                 )
                 # Clear state on security error to prevent reuse
-                with state.oauth_state_lock:
-                    state.oauth_state["state"] = None
+                state.set_oauth_state(None)
                 self.callback_event.set()
             self.send_response(403)
             self.send_header("Content-type", "text/html")
@@ -136,8 +132,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                 with self.callback_lock:
                     self.callback_data["code"] = code_list[0]
                     # Clear OAuth state after successful verification
-                    with state.oauth_state_lock:
-                        state.oauth_state["state"] = None
+                    state.set_oauth_state(None)
                     self.callback_event.set()
                 self.send_response(200)
                 self.send_header("Content-type", "text/html")
@@ -150,8 +145,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                 with self.callback_lock:
                     self.callback_data["error"] = "Empty authorization code"
                     self.callback_data["code"] = None
-                    with state.oauth_state_lock:
-                        state.oauth_state["state"] = None
+                    state.set_oauth_state(None)
                     self.callback_event.set()
                 logger.warning("OAuth callback received empty code parameter")
                 self.send_response(400)
@@ -171,8 +165,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                         f" - {error_description}" if error_description else ""
                     )
                     # Clear OAuth state on error
-                    with state.oauth_state_lock:
-                        state.oauth_state["state"] = None
+                    state.set_oauth_state(None)
                     self.callback_event.set()
                 logger.error(
                     f"OAuth callback error: {error_message}"
@@ -189,8 +182,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                 with self.callback_lock:
                     self.callback_data["error"] = "Empty error parameter received"
                     self.callback_data["code"] = None
-                    with state.oauth_state_lock:
-                        state.oauth_state["state"] = None
+                    state.set_oauth_state(None)
                     self.callback_event.set()
                 logger.warning("OAuth callback received empty error parameter")
                 self.send_response(400)

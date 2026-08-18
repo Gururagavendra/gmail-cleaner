@@ -22,35 +22,35 @@ def download_emails_background(senders: list[str]) -> None:
 
     # Validate input
     if not senders or not isinstance(senders, list):
-        state.download_status["done"] = True
-        state.download_status["error"] = "No senders specified"
+        state.update_download_status(done=True, error="No senders specified")
         return
 
     service, error = get_gmail_service()
     if error:
-        state.download_status["done"] = True
-        state.download_status["error"] = error
+        state.update_download_status(done=True, error=error)
         return
 
-    state.download_status["message"] = "Collecting emails from scan results..."
+    state.update_download_status(message="Collecting emails from scan results...")
 
     # Get message IDs from scan results (only emails we actually scanned)
     all_message_ids = []
+    delete_scan_results = state.get_delete_scan_results()
     for sender in senders:
-        for result in state.delete_scan_results:
+        for result in delete_scan_results:
             if result.get("email") == sender:
                 all_message_ids.extend(result.get("message_ids", []))
                 break
 
     if not all_message_ids:
-        state.download_status["progress"] = 100
-        state.download_status["done"] = True
-        state.download_status["error"] = "No emails found in scan results"
+        state.update_download_status(
+            progress=100, done=True, error="No emails found in scan results"
+        )
         return
 
     total_emails = len(all_message_ids)
-    state.download_status["total_emails"] = total_emails
-    state.download_status["message"] = f"Fetching {total_emails} emails..."
+    state.update_download_status(
+        total_emails=total_emails, message=f"Fetching {total_emails} emails..."
+    )
 
     # Helper to decode base64 email content
     def decode_base64_content(data: str) -> str:
@@ -133,10 +133,11 @@ def download_emails_background(senders: list[str]) -> None:
                 )
 
             fetched += len(batch_ids)
-            state.download_status["fetched_count"] = fetched
-            state.download_status["progress"] = int((fetched / total_emails) * 95)
-            state.download_status["message"] = (
-                f"Fetched {fetched}/{total_emails} emails..."
+            progress = int((fetched / total_emails) * 95)
+            state.update_download_status(
+                fetched_count=fetched,
+                progress=progress,
+                message=f"Fetched {fetched}/{total_emails} emails...",
             )
 
             # Rate limiting: sleep every 5 batches to avoid hitting API limits
@@ -144,13 +145,11 @@ def download_emails_background(senders: list[str]) -> None:
                 time.sleep(0.3)
 
     except Exception as e:
-        state.download_status["done"] = True
-        state.download_status["error"] = f"Error fetching emails: {str(e)}"
+        state.update_download_status(done=True, error=f"Error fetching emails: {e!s}")
         return
 
     # Generate CSV
-    state.download_status["progress"] = 98
-    state.download_status["message"] = "Generating CSV..."
+    state.update_download_status(progress=98, message="Generating CSV...")
 
     try:
         output = io.StringIO()
@@ -170,28 +169,31 @@ def download_emails_background(senders: list[str]) -> None:
         writer.writeheader()
         writer.writerows(email_data)
 
-        state.download_status["csv_data"] = output.getvalue()
-        state.download_status["progress"] = 100
-        state.download_status["done"] = True
-        state.download_status["message"] = f"Ready to download {len(email_data)} emails"
+        state.update_download_status(
+            csv_data=output.getvalue(),
+            progress=100,
+            done=True,
+            message=f"Ready to download {len(email_data)} emails",
+        )
 
     except Exception as e:
-        state.download_status["done"] = True
-        state.download_status["error"] = f"Error generating CSV: {str(e)}"
+        state.update_download_status(done=True, error=f"Error generating CSV: {e!s}")
 
 
 def get_download_status() -> dict:
     """Get download operation status (without CSV data)."""
+    status = state.get_download_status()
     return {
-        "progress": state.download_status["progress"],
-        "message": state.download_status["message"],
-        "done": state.download_status["done"],
-        "error": state.download_status["error"],
-        "total_emails": state.download_status["total_emails"],
-        "fetched_count": state.download_status["fetched_count"],
+        "progress": status["progress"],
+        "message": status["message"],
+        "done": status["done"],
+        "error": status["error"],
+        "total_emails": status["total_emails"],
+        "fetched_count": status["fetched_count"],
     }
 
 
 def get_download_csv() -> str | None:
     """Get the generated CSV data."""
-    return state.download_status.get("csv_data")
+    status = state.get_download_status()
+    return status.get("csv_data")

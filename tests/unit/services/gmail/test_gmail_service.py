@@ -6,11 +6,69 @@ Tests for query building and email parsing helpers.
 
 from app.services.gmail import (
     build_gmail_query,
+    sanitize_gmail_query_value,
     _get_unsubscribe_from_headers,
     _get_sender_info,
     _get_subject,
 )
 from app.models.schemas import FiltersModel
+
+
+class TestSanitizeGmailQueryValue:
+    """Tests for sanitize_gmail_query_value function."""
+
+    def test_simple_email(self):
+        """Simple email should be quoted."""
+        result = sanitize_gmail_query_value("user@example.com")
+        assert result == '"user@example.com"'
+
+    def test_empty_string(self):
+        """Empty string should return empty string."""
+        result = sanitize_gmail_query_value("")
+        assert result == ""
+
+    def test_injection_attempt_with_or_operator(self):
+        """OR operator in value should be quoted, preventing injection."""
+        result = sanitize_gmail_query_value("evil@test.com OR from:admin@company.com")
+        assert result == '"evil@test.com OR from:admin@company.com"'
+        # The OR is now inside quotes, so it's treated as literal text
+
+    def test_injection_attempt_with_parentheses(self):
+        """Parentheses should be quoted to prevent query grouping."""
+        result = sanitize_gmail_query_value("user@example.com) OR (from:admin")
+        assert result == '"user@example.com) OR (from:admin"'
+
+    def test_injection_attempt_with_minus(self):
+        """Minus operator (exclusion) should be quoted."""
+        result = sanitize_gmail_query_value("-important@example.com")
+        assert result == '"-important@example.com"'
+
+    def test_value_with_quotes(self):
+        """Quotes in value should be escaped."""
+        result = sanitize_gmail_query_value('user"with"quotes@test.com')
+        assert result == '"user\\"with\\"quotes@test.com"'
+
+    def test_value_with_backslashes(self):
+        """Backslashes in value should be escaped."""
+        result = sanitize_gmail_query_value("user\\test@example.com")
+        assert result == '"user\\\\test@example.com"'
+
+    def test_value_with_both_quotes_and_backslashes(self):
+        """Both quotes and backslashes should be properly escaped."""
+        result = sanitize_gmail_query_value('test\\"value@example.com')
+        assert result == '"test\\\\\\"value@example.com"'
+
+    def test_complex_injection_attempt(self):
+        """Complex injection with multiple operators should be quoted."""
+        malicious = 'evil@test.com" OR from:admin@company.com OR "'
+        result = sanitize_gmail_query_value(malicious)
+        # All quotes should be escaped
+        assert result == '"evil@test.com\\" OR from:admin@company.com OR \\""'
+
+    def test_domain_name(self):
+        """Domain names should also be quoted."""
+        result = sanitize_gmail_query_value("newsletter.company.com")
+        assert result == '"newsletter.company.com"'
 
 
 class TestBuildGmailQuery:
@@ -60,6 +118,46 @@ class TestBuildGmailQuery:
         """None values should be ignored."""
         filters = {"older_than": None, "larger_than": "10M", "category": None}
         assert build_gmail_query(filters) == "larger:10M"
+
+    def test_sender_filter_is_sanitized(self):
+        """Sender filter should be quoted for safety."""
+        filters = {"sender": "newsletter@example.com"}
+        query = build_gmail_query(filters)
+        assert query == 'from:"newsletter@example.com"'
+
+    def test_sender_filter_prevents_injection(self):
+        """Sender filter should prevent query injection."""
+        # Attempt to inject additional query operators
+        malicious_sender = "evil@test.com OR from:admin@company.com"
+        filters = {"sender": malicious_sender}
+        query = build_gmail_query(filters)
+        # The OR should be inside quotes, treated as literal text
+        assert query == 'from:"evil@test.com OR from:admin@company.com"'
+
+    def test_sender_filter_with_quotes_escaped(self):
+        """Sender filter with quotes should have them escaped."""
+        filters = {"sender": 'user"test@example.com'}
+        query = build_gmail_query(filters)
+        assert query == 'from:"user\\"test@example.com"'
+
+    def test_label_filter_is_sanitized(self):
+        """Label filter should be quoted for safety."""
+        filters = {"label": "my-label"}
+        query = build_gmail_query(filters)
+        assert query == 'label:"my-label"'
+
+    def test_label_filter_prevents_injection(self):
+        """Label filter should prevent query injection."""
+        malicious_label = "spam OR from:admin@company.com"
+        filters = {"label": malicious_label}
+        query = build_gmail_query(filters)
+        assert query == 'label:"spam OR from:admin@company.com"'
+
+    def test_label_filter_with_quotes_escaped(self):
+        """Label filter with quotes should have them escaped."""
+        filters = {"label": 'my"label'}
+        query = build_gmail_query(filters)
+        assert query == 'label:"my\\"label"'
 
 
 class TestGetUnsubscribeFromHeaders:

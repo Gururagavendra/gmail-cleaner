@@ -2,14 +2,19 @@
 Status API Routes
 -----------------
 GET endpoints for checking status of various operations.
+
+Rate limits:
+- Most status endpoints: 120 requests/minute (high frequency polling)
+- Auth endpoints: 30 requests/minute
 """
 
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response
 
+from app.core.rate_limit import limiter, STATUS_RATE_LIMIT, AUTH_RATE_LIMIT
 from app.services import (
     get_scan_status,
     get_scan_results,
@@ -26,6 +31,9 @@ from app.services import (
     get_label_operation_status,
     get_archive_status,
     get_important_status,
+    get_unread_scan_status,
+    get_unread_scan_results,
+    get_unread_action_status,
 )
 
 router = APIRouter(prefix="/api", tags=["Status"])
@@ -33,7 +41,8 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/status")
-async def api_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_status(request: Request):
     """Get email scan status."""
     try:
         return get_scan_status()
@@ -46,7 +55,8 @@ async def api_status():
 
 
 @router.get("/results")
-async def api_results():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_results(request: Request):
     """Get email scan results."""
     try:
         return get_scan_results()
@@ -59,7 +69,8 @@ async def api_results():
 
 
 @router.get("/auth-status")
-async def api_auth_status():
+@limiter.limit(AUTH_RATE_LIMIT)
+async def api_auth_status(request: Request):
     """Get authentication status."""
     try:
         return check_login_status()
@@ -72,7 +83,8 @@ async def api_auth_status():
 
 
 @router.get("/web-auth-status")
-async def api_web_auth_status():
+@limiter.limit(AUTH_RATE_LIMIT)
+async def api_web_auth_status(request: Request):
     """Get web auth status for Docker/headless mode."""
     try:
         return get_web_auth_status()
@@ -85,7 +97,8 @@ async def api_web_auth_status():
 
 
 @router.get("/unread-count")
-async def api_unread_count():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_unread_count(request: Request):
     """Get unread email count."""
     try:
         return get_unread_count()
@@ -98,7 +111,8 @@ async def api_unread_count():
 
 
 @router.get("/mark-read-status")
-async def api_mark_read_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_mark_read_status(request: Request):
     """Get mark-as-read operation status."""
     try:
         return get_mark_read_status()
@@ -111,7 +125,8 @@ async def api_mark_read_status():
 
 
 @router.get("/delete-scan-status")
-async def api_delete_scan_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_delete_scan_status(request: Request):
     """Get delete scan status."""
     try:
         return get_delete_scan_status()
@@ -124,7 +139,8 @@ async def api_delete_scan_status():
 
 
 @router.get("/delete-scan-results")
-async def api_delete_scan_results():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_delete_scan_results(request: Request):
     """Get delete scan results (senders grouped by count)."""
     try:
         return get_delete_scan_results()
@@ -137,7 +153,8 @@ async def api_delete_scan_results():
 
 
 @router.get("/download-status")
-async def api_download_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_download_status(request: Request):
     """Get download operation status."""
     try:
         return get_download_status()
@@ -150,7 +167,8 @@ async def api_download_status():
 
 
 @router.get("/download-csv")
-async def api_download_csv():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_download_csv(request: Request):
     """Get the generated CSV file."""
     try:
         csv_data = get_download_csv()
@@ -178,7 +196,8 @@ async def api_download_csv():
 
 
 @router.get("/delete-bulk-status")
-async def api_delete_bulk_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_delete_bulk_status(request: Request):
     """Get bulk delete operation status."""
     try:
         return get_delete_bulk_status()
@@ -194,7 +213,8 @@ async def api_delete_bulk_status():
 
 
 @router.get("/labels")
-async def api_get_labels():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_get_labels(request: Request):
     """Get all Gmail labels."""
     try:
         return get_labels()
@@ -207,7 +227,8 @@ async def api_get_labels():
 
 
 @router.get("/label-operation-status")
-async def api_label_operation_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_label_operation_status(request: Request):
     """Get label operation status (apply/remove)."""
     try:
         return get_label_operation_status()
@@ -220,7 +241,8 @@ async def api_label_operation_status():
 
 
 @router.get("/archive-status")
-async def api_archive_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_archive_status(request: Request):
     """Get archive operation status."""
     try:
         return get_archive_status()
@@ -233,7 +255,8 @@ async def api_archive_status():
 
 
 @router.get("/important-status")
-async def api_important_status():
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_important_status(request: Request):
     """Get mark important operation status."""
     try:
         return get_important_status()
@@ -242,4 +265,49 @@ async def api_important_status():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get important status",
+        ) from e
+
+
+# ----- Unread Email Endpoints -----
+
+
+@router.get("/unread-scan-status")
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_unread_scan_status(request: Request):
+    """Get unread scan status."""
+    try:
+        return get_unread_scan_status()
+    except Exception as e:
+        logger.exception("Error getting unread scan status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get unread scan status",
+        ) from e
+
+
+@router.get("/unread-scan-results")
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_unread_scan_results(request: Request):
+    """Get unread scan results (senders grouped by count)."""
+    try:
+        return get_unread_scan_results()
+    except Exception as e:
+        logger.exception("Error getting unread scan results")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get unread scan results",
+        ) from e
+
+
+@router.get("/unread-action-status")
+@limiter.limit(STATUS_RATE_LIMIT)
+async def api_unread_action_status(request: Request):
+    """Get unread action (mark read/archive) status."""
+    try:
+        return get_unread_action_status()
+    except Exception as e:
+        logger.exception("Error getting unread action status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get unread action status",
         ) from e

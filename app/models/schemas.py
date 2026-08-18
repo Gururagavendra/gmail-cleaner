@@ -191,6 +191,24 @@ class MarkImportantRequest(BaseModel):
     )
 
 
+class UnreadScanRequest(BaseModel):
+    """Request to scan unread emails by sender."""
+
+    limit: int = Field(default=1000, ge=1, le=10000, description="Max emails to scan")
+    inbox_only: bool = Field(
+        default=True, description="True for inbox only, False for all folders"
+    )
+    filters: Optional[FiltersModel] = Field(
+        default=None, description="Gmail filter options"
+    )
+
+
+class UnreadActionRequest(BaseModel):
+    """Request for bulk actions on unread emails."""
+
+    senders: list[str] = Field(default=[], description="List of sender addresses")
+
+
 # ----- Response Models -----
 
 

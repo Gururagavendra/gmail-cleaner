@@ -53,6 +53,17 @@ GmailCleaner.UI = {
         if (viewName === 'markread') {
             GmailCleaner.MarkRead.refreshUnreadCount();
         }
+
+        // Handle unread view initial state
+        if (viewName === 'unread') {
+            if (GmailCleaner.Unread && GmailCleaner.Unread.results.length === 0) {
+                document.getElementById('unreadNoResults').classList.remove('hidden');
+                document.getElementById('unreadResultsSection').classList.add('hidden');
+            } else if (GmailCleaner.Unread) {
+                document.getElementById('unreadNoResults').classList.add('hidden');
+                document.getElementById('unreadResultsSection').classList.remove('hidden');
+            }
+        }
     },
 
     escapeHtml(text) {

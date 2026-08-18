@@ -31,7 +31,7 @@ def unsubscribe_single(domain: str, link: str) -> dict:
         try:
             link = validate_unsafe_url(link)
         except ValueError as e:
-            return {"success": False, "message": f"Security Error: {str(e)}"}
+            return {"success": False, "message": f"Security Error: {e!s}"}
 
         # Create Default SSL context (Verifies certs by default)
         # We removed the custom context that disabled verification.

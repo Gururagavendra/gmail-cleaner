@@ -32,6 +32,34 @@ class Settings(BaseSettings):
         default="localhost",
         description="Custom host for OAuth redirect (e.g., your domain or IP)",
     )
+    oauth_use_https: bool | None = Field(
+        default=None,
+        description="Force HTTPS (True) or HTTP (False) for OAuth redirect. "
+        "When None, automatically uses HTTP for localhost/Docker hosts, HTTPS otherwise.",
+    )
+
+    @field_validator("oauth_use_https", mode="before")
+    @classmethod
+    def validate_oauth_use_https(cls, v) -> bool | None:
+        """Convert string environment variable to boolean or None."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            normalized = v.lower().strip()
+            if normalized in ("true", "1", "yes", "on"):
+                return True
+            if normalized in ("false", "0", "no", "off"):
+                return False
+            raise ValueError(
+                f"Invalid value '{v}' for oauth_use_https. "
+                "Expected one of: true, 1, yes, on, false, 0, no, off, or empty to unset."
+            )
+        raise ValueError(
+            f"Invalid type for oauth_use_https: {type(v).__name__}. "
+            "Expected bool, string, or None."
+        )
 
     @field_validator("web_auth", mode="before")
     @classmethod

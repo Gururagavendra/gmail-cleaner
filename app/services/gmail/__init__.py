@@ -19,6 +19,7 @@ This module is split into multiple files for better organization:
 from app.services.auth import get_gmail_service
 from app.services.gmail.helpers import (
     build_gmail_query,
+    sanitize_gmail_query_value,
     validate_unsafe_url,
     get_unsubscribe_from_headers,
     get_sender_info,
@@ -67,6 +68,16 @@ from app.services.gmail.important import (
     mark_important_background,
     get_important_status,
 )
+from app.services.gmail.unread import (
+    scan_unread_by_sender,
+    get_unread_scan_status,
+    get_unread_scan_results,
+    get_unread_action_status,
+    mark_read_by_senders_background,
+    mark_read_and_archive_by_senders_background,
+    archive_unread_by_senders_background,
+    delete_unread_by_senders_background,
+)
 
 # Export private helper functions with underscore-prefixed aliases for backward compatibility.
 # These are used by tests that import the original function names from this module.
@@ -95,6 +106,7 @@ __all__ = [
     "get_download_status",
     # Helpers
     "build_gmail_query",
+    "sanitize_gmail_query_value",
     "validate_unsafe_url",
     # Important
     "get_important_status",
@@ -120,4 +132,13 @@ __all__ = [
     "scan_emails",
     # Unsubscribe
     "unsubscribe_single",
+    # Unread
+    "archive_unread_by_senders_background",
+    "delete_unread_by_senders_background",
+    "get_unread_action_status",
+    "get_unread_scan_results",
+    "get_unread_scan_status",
+    "mark_read_and_archive_by_senders_background",
+    "mark_read_by_senders_background",
+    "scan_unread_by_sender",
 ]

@@ -12,8 +12,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.core import settings
+from app.core.rate_limit import limiter
 from app.api import status_router, actions_router
 
 templates = Jinja2Templates(directory="templates")
@@ -133,6 +136,10 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    # Configure rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Mount static files
     app.mount("/static", StaticFiles(directory="static"), name="static")
