@@ -1,6 +1,6 @@
 # Gmail Bulk Unsubscribe & Cleanup Tool
 
-> Note: Guys i am in job search now, so cant able to address all issues, prs, extremely sorry for all delayed response, please give me an month or maz 2 month to figure out this and come back, thank you for all understanding
+> Note: Guys i am in some me time, so cant able to address all issues, prs, extremely sorry for all delayed response, please give me an month or maz 2 month to figure out this and come back, thank you for all understanding
 
 A **free**, privacy-focused tool to bulk unsubscribe from emails, delete emails by sender, and mark emails as read. No subscriptions, no data collection - runs 100% on your machine.
 
