@@ -134,6 +134,7 @@ GmailCleaner.Filters = {
         const category = document.getElementById('filterCategory')?.value || '';
         const sender = document.getElementById('filterSender')?.value?.trim() || '';
         const label = document.getElementById('filterLabel')?.value || '';
+        const mailScope = document.querySelector('input[name="mailScope"]:checked')?.value || 'inbox';
 
         return {
             older_than: olderThan,
@@ -142,7 +143,8 @@ GmailCleaner.Filters = {
             larger_than: largerThan,
             category: category,
             sender: sender,
-            label: label
+            label: label,
+            mail_scope: mailScope
         };
     },
 
@@ -153,12 +155,14 @@ GmailCleaner.Filters = {
         const sender = document.getElementById('filterSender');
         const label = document.getElementById('filterLabel');
         const dateRangeGroup = document.getElementById('dateRangeGroup');
+        const inboxScope = document.querySelector('input[name="mailScope"][value="inbox"]');
 
         if (olderThan) olderThan.value = '';
         if (largerThan) largerThan.value = '';
         if (category) category.value = '';
         if (sender) sender.value = '';
         if (label) label.value = '';
+        if (inboxScope) inboxScope.checked = true;
 
         // Clear date picker
         if (this.litepicker) {

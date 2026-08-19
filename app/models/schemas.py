@@ -34,6 +34,9 @@ class FiltersModel(BaseModel):
         description="Filter emails from specific sender (email address or domain)",
     )
     label: Optional[str] = Field(default=None, description="Gmail label filter")
+    mail_scope: Optional[str] = Field(
+        default="inbox", description="Mail scope: inbox or all"
+    )
 
     @field_validator("older_than")
     @classmethod
@@ -95,6 +98,16 @@ class FiltersModel(BaseModel):
             raise ValueError("sender must be a valid email address or domain")
         return sender
 
+    @field_validator("mail_scope")
+    @classmethod
+    def validate_mail_scope(cls, v) -> str:
+        if v is None or v == "":
+            return "inbox"
+        value = v.strip().lower()
+        if value not in ("inbox", "all"):
+            raise ValueError('mail_scope must be either "inbox" or "all"')
+        return value
+
 
 # ----- Request Models -----
 
@@ -142,12 +155,34 @@ class DeleteEmailsRequest(BaseModel):
     """Request to delete emails from a sender."""
 
     sender: str = Field(default="", description="Sender email address")
+    mail_scope: str = Field(default="inbox", description="Mail scope: inbox or all")
+
+    @field_validator("mail_scope")
+    @classmethod
+    def validate_mail_scope(cls, v) -> str:
+        if v is None or v == "":
+            return "inbox"
+        value = v.strip().lower()
+        if value not in ("inbox", "all"):
+            raise ValueError('mail_scope must be either "inbox" or "all"')
+        return value
 
 
 class DeleteBulkRequest(BaseModel):
     """Request to delete emails from multiple senders."""
 
     senders: list[str] = Field(default=[], description="List of sender addresses")
+    mail_scope: str = Field(default="inbox", description="Mail scope: inbox or all")
+
+    @field_validator("mail_scope")
+    @classmethod
+    def validate_mail_scope(cls, v) -> str:
+        if v is None or v == "":
+            return "inbox"
+        value = v.strip().lower()
+        if value not in ("inbox", "all"):
+            raise ValueError('mail_scope must be either "inbox" or "all"')
+        return value
 
 
 class DownloadEmailsRequest(BaseModel):

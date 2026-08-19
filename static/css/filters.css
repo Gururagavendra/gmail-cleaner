@@ -38,6 +38,46 @@
     color: var(--text-secondary);
 }
 
+.filter-scope-group {
+    gap: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--card-bg);
+}
+
+.filter-radio {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.filter-radio input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.filter-radio span {
+    display: block;
+    min-width: 54px;
+    padding: 6px 12px;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.filter-radio + .filter-radio {
+    border-left: 1px solid var(--border-color);
+}
+
+.filter-radio input:checked + span {
+    background: var(--primary-color);
+    color: white;
+}
+
 .filter-select {
     padding: 6px 12px;
     border: 1px solid var(--border-color);

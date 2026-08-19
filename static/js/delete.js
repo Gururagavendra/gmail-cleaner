@@ -68,6 +68,7 @@ GmailCleaner.Delete = {
 
         const limit = document.getElementById('deleteScanLimit').value;
         const filters = GmailCleaner.Filters.get();
+        GmailCleaner.deleteMailScope = filters.mail_scope || 'inbox';
 
         try {
             const response = await fetch('/api/delete-scan', {
@@ -226,7 +227,10 @@ GmailCleaner.Delete = {
             const response = await fetch('/api/delete-emails', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sender: r.email })
+                body: JSON.stringify({
+                    sender: r.email,
+                    mail_scope: GmailCleaner.deleteMailScope || 'inbox'
+                })
             });
             const result = await response.json();
 
@@ -296,7 +300,10 @@ GmailCleaner.Delete = {
             await fetch('/api/delete-emails-bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ senders: senderEmails })
+                body: JSON.stringify({
+                    senders: senderEmails,
+                    mail_scope: GmailCleaner.deleteMailScope || 'inbox'
+                })
             });
 
             // Poll for progress
