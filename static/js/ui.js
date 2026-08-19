@@ -11,8 +11,38 @@ GmailCleaner.UI = {
                 e.preventDefault();
                 const view = item.dataset.view;
                 this.showView(view);
+                this.closeSidebarForMobile();
             });
         });
+
+        const overlay = document.getElementById('sidebarOverlay');
+        if (overlay) {
+            overlay.addEventListener('click', () => this.closeSidebarForMobile());
+            overlay.addEventListener('touchstart', () => this.closeSidebarForMobile(), { passive: true });
+        }
+
+        const closeIfOutside = (event) => {
+            const sidebar = document.getElementById('sidebar');
+            const menuBtn = document.querySelector('.menu-btn');
+            if (!sidebar || !menuBtn) return;
+
+            const isOpen = sidebar.classList.contains('open');
+            if (!isOpen) return;
+
+            const clickedInsideSidebar = sidebar.contains(event.target);
+            const clickedMenuButton = menuBtn.contains(event.target);
+            if (!clickedInsideSidebar && !clickedMenuButton) {
+                this.closeSidebarForMobile();
+            }
+        };
+
+        document.addEventListener('click', closeIfOutside);
+        document.addEventListener('touchstart', closeIfOutside, { passive: true });
+
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.addEventListener('click', () => this.closeSidebarForMobile());
+        }
     },
 
     showView(viewName) {
@@ -76,7 +106,29 @@ GmailCleaner.UI = {
 
     toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
-        sidebar.classList.toggle('open');
+        const overlay = document.getElementById('sidebarOverlay');
+        const isOpen = sidebar.classList.toggle('open');
+        if (overlay) {
+            overlay.classList.toggle('active', isOpen);
+        }
+        document.body.classList.toggle('sidebar-open', isOpen);
+    },
+
+    closeSidebarForMobile() {
+        const isMobile =
+            window.matchMedia('(max-width: 768px)').matches ||
+            window.matchMedia('(pointer: coarse)').matches;
+        if (!isMobile) return;
+
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) {
+            sidebar.classList.remove('open');
+        }
+        if (overlay) {
+            overlay.classList.remove('active');
+        }
+        document.body.classList.remove('sidebar-open');
     },
 
     // Toast notification system

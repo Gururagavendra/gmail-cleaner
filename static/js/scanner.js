@@ -44,8 +44,11 @@ GmailCleaner.Scanner = {
     async startScan() {
         if (GmailCleaner.scanning) return;
 
-        const authResponse = await fetch('/api/auth-status');
+        const authResponse = await GmailCleaner.apiFetch('/api/auth-status');
         const authStatus = await authResponse.json();
+        if (authStatus.token_json) {
+            GmailCleaner.Session.setToken(authStatus.token_json);
+        }
 
         if (!authStatus.logged_in) {
             GmailCleaner.Auth.signIn();
@@ -71,7 +74,7 @@ GmailCleaner.Scanner = {
         const filters = GmailCleaner.Filters.get();
 
         try {
-            await fetch('/api/scan', {
+            await GmailCleaner.apiFetch('/api/scan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -88,7 +91,7 @@ GmailCleaner.Scanner = {
 
     async pollProgress() {
         try {
-            const response = await fetch('/api/status');
+            const response = await GmailCleaner.apiFetch('/api/status');
             const status = await response.json();
 
             const progressBar = document.getElementById('progressBar');
@@ -103,7 +106,7 @@ GmailCleaner.Scanner = {
 
             if (status.done) {
                 if (!status.error) {
-                    const resultsResponse = await fetch('/api/results');
+                    const resultsResponse = await GmailCleaner.apiFetch('/api/results');
                     GmailCleaner.results = await resultsResponse.json();
                     this.displayResults();
                     this.updateResultsBadge();
@@ -201,7 +204,7 @@ GmailCleaner.Scanner = {
         btn.textContent = 'Working...';
 
         try {
-            const response = await fetch('/api/unsubscribe', {
+            const response = await GmailCleaner.apiFetch('/api/unsubscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domain: r.domain, link: r.link })

@@ -44,8 +44,11 @@ GmailCleaner.Delete = {
     async startScan() {
         if (GmailCleaner.deleteScanning) return;
 
-        const authResponse = await fetch('/api/auth-status');
+        const authResponse = await GmailCleaner.apiFetch('/api/auth-status');
         const authStatus = await authResponse.json();
+        if (authStatus.token_json) {
+            GmailCleaner.Session.setToken(authStatus.token_json);
+        }
 
         if (!authStatus.logged_in) {
             GmailCleaner.Auth.signIn();
@@ -70,7 +73,7 @@ GmailCleaner.Delete = {
         const filters = GmailCleaner.Filters.get();
 
         try {
-            const response = await fetch('/api/delete-scan', {
+            const response = await GmailCleaner.apiFetch('/api/delete-scan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -94,7 +97,7 @@ GmailCleaner.Delete = {
 
     async pollProgress() {
         try {
-            const response = await fetch('/api/delete-scan-status');
+            const response = await GmailCleaner.apiFetch('/api/delete-scan-status');
             const status = await response.json();
 
             const progressBar = document.getElementById('deleteProgressBar');
@@ -105,7 +108,7 @@ GmailCleaner.Delete = {
 
             if (status.done) {
                 if (!status.error) {
-                    const resultsResponse = await fetch('/api/delete-scan-results');
+                    const resultsResponse = await GmailCleaner.apiFetch('/api/delete-scan-results');
                     GmailCleaner.deleteResults = await resultsResponse.json();
                     this.displayResults();
                 } else {
@@ -223,7 +226,7 @@ GmailCleaner.Delete = {
         `;
 
         try {
-            const response = await fetch('/api/delete-emails', {
+            const response = await GmailCleaner.apiFetch('/api/delete-emails', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sender: r.email })
@@ -293,7 +296,7 @@ GmailCleaner.Delete = {
 
         try {
             // Start the background task
-            await fetch('/api/delete-emails-bulk', {
+            await GmailCleaner.apiFetch('/api/delete-emails-bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders: senderEmails })
@@ -309,7 +312,7 @@ GmailCleaner.Delete = {
 
     async pollDeleteProgress(checkboxes) {
         try {
-            const response = await fetch('/api/delete-bulk-status');
+            const response = await GmailCleaner.apiFetch('/api/delete-bulk-status');
             const status = await response.json();
 
             // Update progress bar in overlay
@@ -330,7 +333,7 @@ GmailCleaner.Delete = {
                     });
 
                     setTimeout(async () => {
-                        const resultsResponse = await fetch('/api/delete-scan-results');
+                        const resultsResponse = await GmailCleaner.apiFetch('/api/delete-scan-results');
                         GmailCleaner.deleteResults = await resultsResponse.json();
                         this.displayResults();
                         document.getElementById('deleteSelectAll').checked = false;
@@ -433,7 +436,7 @@ GmailCleaner.Delete = {
 
         try {
             // Start background download
-            await fetch('/api/download-emails', {
+            await GmailCleaner.apiFetch('/api/download-emails', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders: senderEmails })
@@ -449,7 +452,7 @@ GmailCleaner.Delete = {
 
     async pollDownloadProgress() {
         try {
-            const response = await fetch('/api/download-status');
+            const response = await GmailCleaner.apiFetch('/api/download-status');
             const status = await response.json();
 
             this.updateDownloadOverlay(status);

@@ -6,6 +6,8 @@ Tests for POST action endpoints.
 
 from unittest.mock import patch
 
+from app.core.state import SessionState
+
 # client fixture is provided by conftest.py
 
 
@@ -160,7 +162,10 @@ class TestDeleteEmailsEndpoint:
             "/api/delete-emails", json={"sender": "newsletter@example.com"}
         )
         assert response.status_code == 200
-        mock_delete.assert_called_once_with("newsletter@example.com")
+        mock_delete.assert_called_once()
+        args, _ = mock_delete.call_args
+        assert isinstance(args[0], SessionState)
+        assert args[1] == "newsletter@example.com"
 
 
 class TestDeleteBulkEndpoint:
@@ -173,7 +178,10 @@ class TestDeleteBulkEndpoint:
         response = client.post("/api/delete-emails-bulk", json={"senders": senders})
         assert response.status_code == 200
         assert response.json() == {"status": "started"}
-        mock_delete.assert_called_once_with(senders)
+        mock_delete.assert_called_once()
+        args, _ = mock_delete.call_args
+        assert isinstance(args[0], SessionState)
+        assert args[1] == senders
 
     def test_delete_bulk_large_senders_list(self, client):
         """POST /api/delete-emails-bulk with many senders should succeed (no limit)."""
@@ -188,7 +196,10 @@ class TestDeleteBulkEndpoint:
         response = client.post("/api/delete-emails-bulk", json={"senders": []})
         assert response.status_code == 200
         assert response.json() == {"status": "started"}
-        mock_delete.assert_called_once_with([])
+        mock_delete.assert_called_once()
+        args, _ = mock_delete.call_args
+        assert isinstance(args[0], SessionState)
+        assert args[1] == []
 
 
 class TestRequestValidation:

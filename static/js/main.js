@@ -4,13 +4,14 @@
  */
 
 // Global state
-window.GmailCleaner = {
+window.GmailCleaner = window.GmailCleaner || {};
+Object.assign(window.GmailCleaner, {
     results: [],
     deleteResults: [],
     scanning: false,
     deleteScanning: false,
     currentView: 'login'
-};
+});
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {

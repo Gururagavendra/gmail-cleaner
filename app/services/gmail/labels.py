@@ -4,13 +4,13 @@ Gmail Label Management Operations
 Functions for managing Gmail labels.
 """
 
-from app.core import state
+from app.core.state import SessionState
 from app.services.auth import get_gmail_service
 
 
-def get_labels() -> dict:
+def get_labels(session: SessionState) -> dict:
     """Get all Gmail labels."""
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
         return {"success": False, "labels": [], "error": error}
 
@@ -47,12 +47,12 @@ def get_labels() -> dict:
         return {"success": False, "labels": [], "error": str(e)}
 
 
-def create_label(name: str) -> dict:
+def create_label(session: SessionState, name: str) -> dict:
     """Create a new Gmail label."""
     if not name or not name.strip():
         return {"success": False, "label": None, "error": "Label name is required"}
 
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
         return {"success": False, "label": None, "error": error}
 
@@ -85,12 +85,12 @@ def create_label(name: str) -> dict:
         return {"success": False, "label": None, "error": error_msg}
 
 
-def delete_label(label_id: str) -> dict:
+def delete_label(session: SessionState, label_id: str) -> dict:
     """Delete a Gmail label."""
     if not label_id:
         return {"success": False, "error": "Label ID is required"}
 
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
         return {"success": False, "error": error}
 
@@ -107,6 +107,7 @@ def delete_label(label_id: str) -> dict:
 
 
 def _apply_label_operation_background(
+    session: SessionState,
     label_id: str,
     senders: list[str],
     *,
@@ -131,28 +132,28 @@ def _apply_label_operation_background(
         success_message_template: Template for success message (use {count})
         error_message_template: Template for error message (use {count})
     """
-    state.reset_label_operation()
+    session.reset_label_operation()
 
     if not label_id or not label_id.strip():
-        state.label_operation_status["done"] = True
-        state.label_operation_status["error"] = "Label ID is required"
+        session.label_operation_status["done"] = True
+        session.label_operation_status["error"] = "Label ID is required"
         return
 
     # Validate input
     if not senders or not isinstance(senders, list):
-        state.label_operation_status["done"] = True
-        state.label_operation_status["error"] = "No senders specified"
+        session.label_operation_status["done"] = True
+        session.label_operation_status["error"] = "No senders specified"
         return
 
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
-        state.label_operation_status["done"] = True
-        state.label_operation_status["error"] = error
+        session.label_operation_status["done"] = True
+        session.label_operation_status["error"] = error
         return
 
     total_senders = len(senders)
-    state.label_operation_status["total_senders"] = total_senders
-    state.label_operation_status["message"] = finding_message
+    session.label_operation_status["total_senders"] = total_senders
+    session.label_operation_status["message"] = finding_message
 
     # Phase 1: Collect all message IDs
     all_message_ids = []
@@ -168,18 +169,20 @@ def _apply_label_operation_background(
             )
             label_name = label_info.get("name", "")
             if not label_name:
-                state.label_operation_status["done"] = True
-                state.label_operation_status["error"] = "Could not get label name"
+                session.label_operation_status["done"] = True
+                session.label_operation_status["error"] = "Could not get label name"
                 return
         except Exception as e:
-            state.label_operation_status["done"] = True
-            state.label_operation_status["error"] = f"Failed to fetch label: {str(e)}"
+            session.label_operation_status["done"] = True
+            session.label_operation_status["error"] = (
+                f"Failed to fetch label: {str(e)}"
+            )
             return
 
     for i, sender in enumerate(senders):
-        state.label_operation_status["current_sender"] = i + 1
-        state.label_operation_status["progress"] = int((i / total_senders) * 40)
-        state.label_operation_status["message"] = f"Finding emails from {sender}..."
+        session.label_operation_status["current_sender"] = i + 1
+        session.label_operation_status["progress"] = int((i / total_senders) * 40)
+        session.label_operation_status["message"] = f"Finding emails from {sender}..."
 
         try:
             # Build query: for remove, include label filter; for add, just sender
@@ -215,14 +218,14 @@ def _apply_label_operation_background(
             errors.append(f"{sender}: {str(e)}")
 
     if not all_message_ids:
-        state.label_operation_status["progress"] = 100
-        state.label_operation_status["done"] = True
-        state.label_operation_status["message"] = no_emails_message
+        session.label_operation_status["progress"] = 100
+        session.label_operation_status["done"] = True
+        session.label_operation_status["message"] = no_emails_message
         return
 
     # Phase 2: Apply/remove label in batches
     total_emails = len(all_message_ids)
-    state.label_operation_status["message"] = applying_message.format(
+    session.label_operation_status["message"] = applying_message.format(
         count=total_emails
     )
 
@@ -241,35 +244,40 @@ def _apply_label_operation_background(
             body = {**body_template, "ids": batch}
             service.users().messages().batchModify(userId="me", body=body).execute()
             affected += len(batch)
-            state.label_operation_status["affected_count"] = affected
-            state.label_operation_status["progress"] = 40 + int(
+            session.label_operation_status["affected_count"] = affected
+            session.label_operation_status["progress"] = 40 + int(
                 (affected / total_emails) * 60
             )
-            state.label_operation_status["message"] = progress_message_template.format(
-                count=affected, total=total_emails
+            session.label_operation_status["message"] = (
+                progress_message_template.format(count=affected, total=total_emails)
             )
     except Exception as e:
         errors.append(f"Batch operation error: {str(e)}")
 
     # Done
-    state.label_operation_status["progress"] = 100
-    state.label_operation_status["done"] = True
-    state.label_operation_status["affected_count"] = affected
+    session.label_operation_status["progress"] = 100
+    session.label_operation_status["done"] = True
+    session.label_operation_status["affected_count"] = affected
 
     if errors:
-        state.label_operation_status["error"] = f"Some errors: {'; '.join(errors[:3])}"
-        state.label_operation_status["message"] = error_message_template.format(
+        session.label_operation_status["error"] = (
+            f"Some errors: {'; '.join(errors[:3])}"
+        )
+        session.label_operation_status["message"] = error_message_template.format(
             count=affected
         )
     else:
-        state.label_operation_status["message"] = success_message_template.format(
+        session.label_operation_status["message"] = success_message_template.format(
             count=affected
         )
 
 
-def apply_label_to_senders_background(label_id: str, senders: list[str]) -> None:
+def apply_label_to_senders_background(
+    session: SessionState, label_id: str, senders: list[str]
+) -> None:
     """Apply a label to all emails from specified senders (background task)."""
     _apply_label_operation_background(
+        session=session,
         label_id=label_id,
         senders=senders,
         add_label=True,
@@ -282,9 +290,12 @@ def apply_label_to_senders_background(label_id: str, senders: list[str]) -> None
     )
 
 
-def remove_label_from_senders_background(label_id: str, senders: list[str]) -> None:
+def remove_label_from_senders_background(
+    session: SessionState, label_id: str, senders: list[str]
+) -> None:
     """Remove a label from all emails from specified senders (background task)."""
     _apply_label_operation_background(
+        session=session,
         label_id=label_id,
         senders=senders,
         add_label=False,
@@ -297,6 +308,6 @@ def remove_label_from_senders_background(label_id: str, senders: list[str]) -> N
     )
 
 
-def get_label_operation_status() -> dict:
+def get_label_operation_status(session: SessionState) -> dict:
     """Get label operation status."""
-    return state.label_operation_status.copy()
+    return session.label_operation_status.copy()

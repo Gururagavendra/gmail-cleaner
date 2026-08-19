@@ -81,6 +81,7 @@
                     </div>
                 </div>
             </aside>
+            <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
             <!-- Main Content -->
             <main class="main-content">
@@ -460,6 +461,7 @@
     </div>
 
     <!-- Modular JavaScript (cache-busted) -->
+    <script src="/static/js/api.js?v={{ cache_bust }}"></script>
     <script src="/static/js/main.js?v={{ cache_bust }}"></script>
     <script src="/static/js/ui.js?v={{ cache_bust }}"></script>
     <script src="/static/js/auth.js?v={{ cache_bust }}"></script>

@@ -7,7 +7,7 @@ GET endpoints for checking status of various operations.
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 
 from app.services import (
@@ -27,16 +27,17 @@ from app.services import (
     get_archive_status,
     get_important_status,
 )
+from app.api.deps import SessionContext, get_session_context
 
 router = APIRouter(prefix="/api", tags=["Status"])
 logger = logging.getLogger(__name__)
 
 
 @router.get("/status")
-async def api_status():
+async def api_status(ctx: SessionContext = Depends(get_session_context)):
     """Get email scan status."""
     try:
-        return get_scan_status()
+        return get_scan_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting scan status")
         raise HTTPException(
@@ -46,10 +47,10 @@ async def api_status():
 
 
 @router.get("/results")
-async def api_results():
+async def api_results(ctx: SessionContext = Depends(get_session_context)):
     """Get email scan results."""
     try:
-        return get_scan_results()
+        return get_scan_results(ctx.session)
     except Exception as e:
         logger.exception("Error getting scan results")
         raise HTTPException(
@@ -59,10 +60,15 @@ async def api_results():
 
 
 @router.get("/auth-status")
-async def api_auth_status():
+async def api_auth_status(ctx: SessionContext = Depends(get_session_context)):
     """Get authentication status."""
     try:
-        return check_login_status()
+        status_info = check_login_status(ctx.session, ctx.token_json)
+        pending_token = ctx.session.pending_token_json
+        if pending_token:
+            ctx.session.pending_token_json = None
+            status_info = status_info | {"token_json": pending_token}
+        return status_info
     except Exception as e:
         logger.exception("Error getting auth status")
         raise HTTPException(
@@ -72,10 +78,10 @@ async def api_auth_status():
 
 
 @router.get("/web-auth-status")
-async def api_web_auth_status():
+async def api_web_auth_status(ctx: SessionContext = Depends(get_session_context)):
     """Get web auth status for Docker/headless mode."""
     try:
-        return get_web_auth_status()
+        return get_web_auth_status(ctx.session, ctx.token_json)
     except Exception as e:
         logger.exception("Error getting web auth status")
         raise HTTPException(
@@ -85,10 +91,10 @@ async def api_web_auth_status():
 
 
 @router.get("/unread-count")
-async def api_unread_count():
+async def api_unread_count(ctx: SessionContext = Depends(get_session_context)):
     """Get unread email count."""
     try:
-        return get_unread_count()
+        return get_unread_count(ctx.session)
     except Exception as e:
         logger.exception("Error getting unread count")
         raise HTTPException(
@@ -98,10 +104,10 @@ async def api_unread_count():
 
 
 @router.get("/mark-read-status")
-async def api_mark_read_status():
+async def api_mark_read_status(ctx: SessionContext = Depends(get_session_context)):
     """Get mark-as-read operation status."""
     try:
-        return get_mark_read_status()
+        return get_mark_read_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting mark-read status")
         raise HTTPException(
@@ -111,10 +117,10 @@ async def api_mark_read_status():
 
 
 @router.get("/delete-scan-status")
-async def api_delete_scan_status():
+async def api_delete_scan_status(ctx: SessionContext = Depends(get_session_context)):
     """Get delete scan status."""
     try:
-        return get_delete_scan_status()
+        return get_delete_scan_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting delete scan status")
         raise HTTPException(
@@ -124,10 +130,10 @@ async def api_delete_scan_status():
 
 
 @router.get("/delete-scan-results")
-async def api_delete_scan_results():
+async def api_delete_scan_results(ctx: SessionContext = Depends(get_session_context)):
     """Get delete scan results (senders grouped by count)."""
     try:
-        return get_delete_scan_results()
+        return get_delete_scan_results(ctx.session)
     except Exception as e:
         logger.exception("Error getting delete scan results")
         raise HTTPException(
@@ -137,10 +143,10 @@ async def api_delete_scan_results():
 
 
 @router.get("/download-status")
-async def api_download_status():
+async def api_download_status(ctx: SessionContext = Depends(get_session_context)):
     """Get download operation status."""
     try:
-        return get_download_status()
+        return get_download_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting download status")
         raise HTTPException(
@@ -150,10 +156,10 @@ async def api_download_status():
 
 
 @router.get("/download-csv")
-async def api_download_csv():
+async def api_download_csv(ctx: SessionContext = Depends(get_session_context)):
     """Get the generated CSV file."""
     try:
-        csv_data = get_download_csv()
+        csv_data = get_download_csv(ctx.session)
         if not csv_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -178,10 +184,10 @@ async def api_download_csv():
 
 
 @router.get("/delete-bulk-status")
-async def api_delete_bulk_status():
+async def api_delete_bulk_status(ctx: SessionContext = Depends(get_session_context)):
     """Get bulk delete operation status."""
     try:
-        return get_delete_bulk_status()
+        return get_delete_bulk_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting delete bulk status")
         raise HTTPException(
@@ -194,10 +200,10 @@ async def api_delete_bulk_status():
 
 
 @router.get("/labels")
-async def api_get_labels():
+async def api_get_labels(ctx: SessionContext = Depends(get_session_context)):
     """Get all Gmail labels."""
     try:
-        return get_labels()
+        return get_labels(ctx.session)
     except Exception as e:
         logger.exception("Error getting labels")
         raise HTTPException(
@@ -207,10 +213,12 @@ async def api_get_labels():
 
 
 @router.get("/label-operation-status")
-async def api_label_operation_status():
+async def api_label_operation_status(
+    ctx: SessionContext = Depends(get_session_context),
+):
     """Get label operation status (apply/remove)."""
     try:
-        return get_label_operation_status()
+        return get_label_operation_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting label operation status")
         raise HTTPException(
@@ -220,10 +228,10 @@ async def api_label_operation_status():
 
 
 @router.get("/archive-status")
-async def api_archive_status():
+async def api_archive_status(ctx: SessionContext = Depends(get_session_context)):
     """Get archive operation status."""
     try:
-        return get_archive_status()
+        return get_archive_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting archive status")
         raise HTTPException(
@@ -233,10 +241,10 @@ async def api_archive_status():
 
 
 @router.get("/important-status")
-async def api_important_status():
+async def api_important_status(ctx: SessionContext = Depends(get_session_context)):
     """Get mark important operation status."""
     try:
-        return get_important_status()
+        return get_important_status(ctx.session)
     except Exception as e:
         logger.exception("Error getting important status")
         raise HTTPException(

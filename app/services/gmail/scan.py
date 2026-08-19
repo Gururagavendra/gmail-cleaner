@@ -10,7 +10,7 @@ from collections import defaultdict
 from email.utils import parsedate_to_datetime
 from typing import Optional
 
-from app.core import state
+from app.core.state import SessionState
 from app.services.auth import get_gmail_service
 from app.services.gmail.helpers import (
     build_gmail_query,
@@ -22,26 +22,28 @@ from app.services.gmail.helpers import (
 logger = logging.getLogger(__name__)
 
 
-def scan_emails(limit: int = 500, filters: Optional[dict] = None):
+def scan_emails(
+    session: SessionState, limit: int = 500, filters: Optional[dict] = None
+):
     """Scan emails for unsubscribe links using Gmail Batch API."""
     # Validate input
     if limit <= 0:
-        state.reset_scan()
-        state.scan_status["error"] = "Limit must be greater than 0"
-        state.scan_status["done"] = True
+        session.reset_scan()
+        session.scan_status["error"] = "Limit must be greater than 0"
+        session.scan_status["done"] = True
         return
 
-    state.reset_scan()
-    state.scan_status["message"] = "Connecting to Gmail..."
+    session.reset_scan()
+    session.scan_status["message"] = "Connecting to Gmail..."
 
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
-        state.scan_status["error"] = error
-        state.scan_status["done"] = True
+        session.scan_status["error"] = error
+        session.scan_status["done"] = True
         return
 
     try:
-        state.scan_status["message"] = "Fetching email list..."
+        session.scan_status["message"] = "Fetching email list..."
 
         # Build query
         query = build_gmail_query(filters)
@@ -70,12 +72,12 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                 break
 
         if not message_ids:
-            state.scan_status["message"] = "No emails found"
-            state.scan_status["done"] = True
+            session.scan_status["message"] = "No emails found"
+            session.scan_status["done"] = True
             return
 
         total = len(message_ids)
-        state.scan_status["message"] = f"Found {total} emails. Scanning..."
+        session.scan_status["message"] = f"Found {total} emails. Scanning..."
 
         # Process in batches using Gmail Batch API (100 requests per HTTP call!)
         unsubscribe_data: dict[str, dict] = defaultdict(
@@ -188,8 +190,8 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
             batch.execute()
 
             progress = int((i + len(batch_ids)) / total * 100)
-            state.scan_status["progress"] = progress
-            state.scan_status["message"] = (
+            session.scan_status["progress"] = progress
+            session.scan_status["message"] = (
                 f"Scanned {processed}/{total} emails ({len(unsubscribe_data)} found)"
             )
 
@@ -217,20 +219,22 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
             reverse=True,
         )
 
-        state.scan_results = sorted_results
-        state.scan_status["message"] = f"Found {len(state.scan_results)} subscriptions"
-        state.scan_status["done"] = True
+        session.scan_results = sorted_results
+        session.scan_status["message"] = (
+            f"Found {len(session.scan_results)} subscriptions"
+        )
+        session.scan_status["done"] = True
 
     except Exception as e:
-        state.scan_status["error"] = str(e)
-        state.scan_status["done"] = True
+        session.scan_status["error"] = str(e)
+        session.scan_status["done"] = True
 
 
-def get_scan_status() -> dict:
+def get_scan_status(session: SessionState) -> dict:
     """Get current scan status."""
-    return state.scan_status.copy()
+    return session.scan_status.copy()
 
 
-def get_scan_results() -> list:
+def get_scan_results(session: SessionState) -> list:
     """Get scan results."""
-    return state.scan_results.copy()
+    return session.scan_results.copy()

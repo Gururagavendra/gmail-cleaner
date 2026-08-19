@@ -12,7 +12,7 @@ GmailCleaner.Labels = {
 
     async loadLabels() {
         try {
-            const response = await fetch('/api/labels');
+            const response = await GmailCleaner.apiFetch('/api/labels');
             const data = await response.json();
 
             if (data.success) {
@@ -31,7 +31,7 @@ GmailCleaner.Labels = {
 
     async createLabel(name) {
         try {
-            const response = await fetch('/api/labels', {
+            const response = await GmailCleaner.apiFetch('/api/labels', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
@@ -52,7 +52,7 @@ GmailCleaner.Labels = {
 
     async deleteLabel(labelId) {
         try {
-            const response = await fetch(`/api/labels/${encodeURIComponent(labelId)}`, {
+            const response = await GmailCleaner.apiFetch(`/api/labels/${encodeURIComponent(labelId)}`, {
                 method: 'DELETE'
             });
             const result = await response.json();
@@ -70,7 +70,7 @@ GmailCleaner.Labels = {
 
     async applyLabelToSenders(labelId, senders) {
         try {
-            const response = await fetch('/api/apply-label', {
+            const response = await GmailCleaner.apiFetch('/api/apply-label', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ label_id: labelId, senders })
@@ -83,7 +83,7 @@ GmailCleaner.Labels = {
 
     async removeLabelFromSenders(labelId, senders) {
         try {
-            const response = await fetch('/api/remove-label', {
+            const response = await GmailCleaner.apiFetch('/api/remove-label', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ label_id: labelId, senders })
@@ -96,7 +96,7 @@ GmailCleaner.Labels = {
 
     async pollLabelOperation(onComplete) {
         try {
-            const response = await fetch('/api/label-operation-status');
+            const response = await GmailCleaner.apiFetch('/api/label-operation-status');
             const status = await response.json();
 
             if (status.done) {
@@ -401,7 +401,7 @@ GmailCleaner.Labels = {
         this.showArchiveOverlay(senders.length);
 
         try {
-            const response = await fetch('/api/archive', {
+            const response = await GmailCleaner.apiFetch('/api/archive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders })
@@ -423,7 +423,7 @@ GmailCleaner.Labels = {
 
     async pollArchiveStatus() {
         try {
-            const response = await fetch('/api/archive-status');
+            const response = await GmailCleaner.apiFetch('/api/archive-status');
             const status = await response.json();
 
             this.updateArchiveOverlay(status);
@@ -508,7 +508,7 @@ GmailCleaner.Labels = {
         this.showImportantOverlay(senders.length);
 
         try {
-            const response = await fetch('/api/mark-important', {
+            const response = await GmailCleaner.apiFetch('/api/mark-important', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ senders, important: true })
@@ -530,7 +530,7 @@ GmailCleaner.Labels = {
 
     async pollImportantStatus() {
         try {
-            const response = await fetch('/api/important-status');
+            const response = await GmailCleaner.apiFetch('/api/important-status');
             const status = await response.json();
 
             this.updateImportantOverlay(status);
@@ -598,8 +598,11 @@ GmailCleaner.Labels = {
 document.addEventListener('DOMContentLoaded', async () => {
     // Load labels after a short delay to ensure auth check completes
     setTimeout(async () => {
-        const authResponse = await fetch('/api/auth-status');
+        const authResponse = await GmailCleaner.apiFetch('/api/auth-status');
         const authStatus = await authResponse.json();
+        if (authStatus.token_json) {
+            GmailCleaner.Session.setToken(authStatus.token_json);
+        }
         if (authStatus.logged_in) {
             await GmailCleaner.Labels.loadLabels();
         }

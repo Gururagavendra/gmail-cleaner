@@ -23,23 +23,111 @@
 
 /* Mobile */
 @media (max-width: 768px) {
+    html, body {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    .app-container,
+    .main-wrapper,
+    .main-content,
+    .header,
+    .filter-bar,
+    .main-content-inner {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
     .header {
-        padding: 12px 16px;
+        padding: 10px 12px;
+        height: auto;
+        gap: 8px;
+        z-index: 200;
+    }
+
+    .header-left {
+        gap: 6px;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .header-right {
+        min-width: 0;
+        flex: 0 1 auto;
+    }
+
+    .menu-btn {
+        width: 40px;
+        height: 40px;
     }
 
     .header h1 {
         font-size: 18px;
     }
 
-    .sidebar {
-        position: fixed;
-        left: -250px;
-        z-index: 1000;
-        width: 250px;
-        transition: left 0.3s ease;
+    .logo {
+        min-width: 0;
     }
 
-    .sidebar.active {
+    .logo-text {
+        font-size: 18px;
+    }
+
+    .user-section {
+        gap: 8px;
+        min-width: 0;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .user-email {
+        display: none;
+    }
+
+    .user-avatar {
+        user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        -webkit-touch-callout: none;
+        outline: none;
+        box-shadow: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .user-avatar:focus,
+    .user-avatar:active {
+        outline: none;
+        box-shadow: none;
+    }
+
+    .user-avatar * {
+        user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+    }
+
+    .header .btn-sm {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        z-index: 180;
+        width: 280px;
+        height: 100vh;
+        top: 0;
+        padding-top: 64px;
+        border-right: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md);
+        transition: left 0.25s ease;
+        overflow-y: auto;
+    }
+
+    .sidebar.active,
+    .sidebar.open {
         left: 0;
     }
 
@@ -58,20 +146,32 @@
         padding: 16px;
     }
 
+    .main-content-inner {
+        padding: 16px;
+        max-width: 100%;
+    }
+
     /* Mobile menu overlay */
     .sidebar-overlay {
         display: none;
         position: fixed;
-        top: 60px;
+        top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.3);
-        z-index: 999;
+        background: rgba(32, 33, 36, 0.35);
+        backdrop-filter: blur(2px);
+        z-index: 170;
+        pointer-events: none;
     }
 
     .sidebar-overlay.active {
         display: block;
+        pointer-events: auto;
+    }
+
+    body.sidebar-open {
+        overflow: hidden;
     }
 
     /* Show menu button on mobile */
@@ -82,15 +182,36 @@
     /* Filter bar mobile */
     .filter-bar {
         flex-wrap: wrap;
-        padding: 12px;
+        padding: 12px 16px;
+    }
+
+    .filter-bar-content {
+        gap: 12px;
     }
 
     .filter-group {
         width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
     }
 
     .filter-select {
         width: 100%;
+        min-width: 0;
+    }
+
+    .filter-input,
+    .date-range-input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .filter-clear-btn {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+        padding: 10px 12px;
     }
 
     .filter-actions {
@@ -103,23 +224,53 @@
         padding: 16px;
     }
 
+    .scan-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .scan-row .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .form-select {
+        max-width: none;
+    }
+
     /* Results */
+    .results-list {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .result-item {
+        flex-wrap: nowrap;
+        min-width: 720px;
+    }
+
     .result-content {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 
     .result-sender {
-        width: 100%;
+        width: 200px;
     }
 
     .result-subject {
-        width: 100%;
+        width: 300px;
+    }
+
+    .result-meta {
+        min-width: 180px;
     }
 
     .result-actions {
-        width: 100%;
+        width: auto;
         margin-left: 0;
-        margin-top: 8px;
+        margin-top: 0;
+        flex-wrap: wrap;
     }
 
     /* Toolbar */
@@ -130,6 +281,30 @@
 
     .toolbar-left, .toolbar-right {
         flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .toolbar-right .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .action-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .action-group {
+        flex-wrap: wrap;
+    }
+
+    .action-divider {
+        display: none;
+    }
+
+    .btn.btn-action {
+        width: 100%;
+        justify-content: center;
     }
 
     /* Unread info */
@@ -192,6 +367,88 @@
         width: 24px;
         height: 24px;
         font-size: 12px;
+    }
+}
+
+/* Touch devices with wide CSS viewports */
+@media (pointer: coarse) and (min-width: 769px) {
+    .sidebar {
+        position: fixed;
+        left: -250px;
+        z-index: 1000;
+        width: 250px;
+        transition: left 0.3s ease;
+    }
+
+    .sidebar.active,
+    .sidebar.open {
+        left: 0;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 16px;
+    }
+
+    .main-content-inner {
+        padding: 16px;
+        max-width: 100%;
+    }
+
+    .filter-bar {
+        padding: 12px 16px;
+    }
+
+    .filter-bar-content {
+        gap: 12px;
+    }
+
+    .filter-group {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .filter-select,
+    .filter-input,
+    .date-range-input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .filter-clear-btn {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+        padding: 10px 12px;
+    }
+
+    .scan-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .scan-row .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .toolbar-left,
+    .toolbar-right {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .toolbar-right .btn {
+        width: 100%;
+        justify-content: center;
     }
 }
 

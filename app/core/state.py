@@ -1,18 +1,24 @@
 """
-Global Application State
-------------------------
-Shared state across the application.
+Session Application State
+-------------------------
+Per-session state for multi-user usage.
 """
 
 import threading
 
 
-class AppState:
-    """Global application state container."""
+class SessionState:
+    """Per-session application state container."""
 
     def __init__(self) -> None:
         # User state
         self.current_user: dict = {"email": None, "logged_in": False}
+        self.token_json: str | None = None
+        self.pending_token_json: str | None = None
+        self.auth_in_progress: bool = False
+        self.oauth_host: str | None = None
+        self.oauth_scheme: str | None = None
+        self.allow_token_file: bool = True
 
         # Scan state
         self.scan_results: list = []
@@ -193,5 +199,28 @@ class AppState:
         }
 
 
-# Global state instance
-state = AppState()
+class SessionStore:
+    """Thread-safe store for per-session state."""
+
+    def __init__(self) -> None:
+        self._sessions: dict[str, SessionState] = {}
+        self._lock = threading.Lock()
+
+    def get(self, session_id: str) -> SessionState:
+        """Get or create a session state for a session id."""
+        if not session_id:
+            session_id = "default"
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                session = SessionState()
+                self._sessions[session_id] = session
+        return session
+
+
+_sessions = SessionStore()
+
+
+def get_session_state(session_id: str) -> SessionState:
+    """Fetch per-session state."""
+    return _sessions.get(session_id)

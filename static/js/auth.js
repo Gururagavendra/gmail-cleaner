@@ -7,8 +7,11 @@ window.GmailCleaner = window.GmailCleaner || {};
 GmailCleaner.Auth = {
     async checkStatus() {
         try {
-            const response = await fetch('/api/auth-status');
+            const response = await GmailCleaner.apiFetch('/api/auth-status');
             const status = await response.json();
+            if (status.token_json) {
+                GmailCleaner.Session.setToken(status.token_json);
+            }
             this.updateUI(status);
         } catch (error) {
             console.error('Error checking auth status:', error);
@@ -60,7 +63,7 @@ GmailCleaner.Auth = {
         }
 
         try {
-            const statusResp = await fetch('/api/web-auth-status');
+            const statusResp = await GmailCleaner.apiFetch('/api/web-auth-status');
             const status = await statusResp.json();
 
             // Check if credentials exist
@@ -70,21 +73,7 @@ GmailCleaner.Auth = {
                 return;
             }
 
-            if (status.web_auth_mode) {
-                const msg = `Docker detected! To sign in:
-
-1. Check Docker logs for the authorization URL:
-   docker logs cleanup_email-gmail-cleaner-1
-
-2. Copy the URL and open it in your browser
-
-3. After authorizing, you'll be signed in automatically.
-
-(Or generate token.json locally and mount it)`;
-                alert(msg);
-            }
-
-            const signInResp = await fetch('/api/sign-in', { method: 'POST' });
+            const signInResp = await GmailCleaner.apiFetch('/api/sign-in', { method: 'POST' });
             const signInResult = await signInResp.json();
 
             if (signInResult.error) {
@@ -93,10 +82,36 @@ GmailCleaner.Auth = {
                 return;
             }
 
+            this.pollAuthUrl();
             this.pollStatus();
         } catch (error) {
             alert('Error signing in: ' + error.message);
             this.resetSignInButton();
+        }
+    },
+    async pollAuthUrl(attempts = 0) {
+        const maxAttempts = 120;
+
+        try {
+            const statusResp = await GmailCleaner.apiFetch('/api/web-auth-status');
+            const status = await statusResp.json();
+
+            if (status.pending_auth_url) {
+                try {
+                    window.open(status.pending_auth_url, '_blank', 'noopener');
+                } catch (error) {
+                    console.warn('Failed to open auth URL:', error);
+                }
+                return;
+            }
+
+            if (attempts < maxAttempts) {
+                setTimeout(() => this.pollAuthUrl(attempts + 1), 1000);
+            }
+        } catch (error) {
+            if (attempts < maxAttempts) {
+                setTimeout(() => this.pollAuthUrl(attempts + 1), 1000);
+            }
         }
     },
 
@@ -105,8 +120,12 @@ GmailCleaner.Auth = {
         const signInBtn = document.getElementById('signInBtn');
 
         try {
-            const response = await fetch('/api/auth-status');
+            const response = await GmailCleaner.apiFetch('/api/auth-status');
             const status = await response.json();
+
+            if (status.token_json) {
+                GmailCleaner.Session.setToken(status.token_json);
+            }
 
             if (status.logged_in) {
                 this.updateUI(status);
@@ -142,7 +161,8 @@ GmailCleaner.Auth = {
         if (!confirm('Sign out of your Gmail account?')) return;
 
         try {
-            await fetch('/api/sign-out', { method: 'POST' });
+            await GmailCleaner.apiFetch('/api/sign-out', { method: 'POST' });
+            GmailCleaner.Session.clearToken();
             GmailCleaner.results = [];
             GmailCleaner.Scanner.updateResultsBadge();
             GmailCleaner.Scanner.displayResults();

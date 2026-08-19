@@ -10,7 +10,7 @@ GmailCleaner.MarkRead = {
         countEl.textContent = '...';
 
         try {
-            const response = await fetch('/api/unread-count');
+            const response = await GmailCleaner.apiFetch('/api/unread-count');
             const data = await response.json();
 
             if (data.error) {
@@ -47,7 +47,7 @@ GmailCleaner.MarkRead = {
         progressCard.classList.remove('hidden');
 
         try {
-            await fetch('/api/mark-read', {
+            await GmailCleaner.apiFetch('/api/mark-read', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -64,7 +64,7 @@ GmailCleaner.MarkRead = {
 
     async pollProgress() {
         try {
-            const response = await fetch('/api/mark-read-status');
+            const response = await GmailCleaner.apiFetch('/api/mark-read-status');
             const status = await response.json();
 
             const progressBar = document.getElementById('markReadProgressBar');

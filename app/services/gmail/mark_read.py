@@ -6,14 +6,14 @@ Functions for marking emails as read.
 
 from typing import Optional
 
-from app.core import state
+from app.core.state import SessionState
 from app.services.auth import get_gmail_service
 from app.services.gmail.helpers import build_gmail_query
 
 
-def get_unread_count() -> dict:
+def get_unread_count(session: SessionState) -> dict:
     """Get estimated count of unread emails in Inbox (fast, for display)."""
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
         return {"count": 0, "error": error}
 
@@ -32,7 +32,9 @@ def get_unread_count() -> dict:
         return {"count": 0, "error": str(e)}
 
 
-def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
+def mark_emails_as_read(
+    session: SessionState, count: int = 100, filters: Optional[dict] = None
+):
     """Mark unread emails as read.
 
     Args:
@@ -41,22 +43,22 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
     """
     # Validate input
     if count < 0:
-        state.reset_mark_read()
-        state.mark_read_status["error"] = "Count must be 0 or greater"
-        state.mark_read_status["done"] = True
+        session.reset_mark_read()
+        session.mark_read_status["error"] = "Count must be 0 or greater"
+        session.mark_read_status["done"] = True
         return
 
-    state.reset_mark_read()
-    state.mark_read_status["message"] = "Connecting to Gmail..."
+    session.reset_mark_read()
+    session.mark_read_status["message"] = "Connecting to Gmail..."
 
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
-        state.mark_read_status["error"] = error
-        state.mark_read_status["done"] = True
+        session.mark_read_status["error"] = error
+        session.mark_read_status["done"] = True
         return
 
     try:
-        state.mark_read_status["message"] = "Finding unread emails..."
+        session.mark_read_status["message"] = "Finding unread emails..."
 
         # Build query
         query = "is:unread"
@@ -105,8 +107,8 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
                 ).execute()
 
                 marked += len(ids)
-                state.mark_read_status["message"] = f"Marked {marked} as read..."
-                state.mark_read_status["marked_count"] = marked
+                session.mark_read_status["message"] = f"Marked {marked} as read..."
+                session.mark_read_status["marked_count"] = marked
 
             # Stop if we've marked enough (when not marking all)
             if not mark_all and remaining <= 0:
@@ -118,19 +120,21 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
                 break
 
         if marked == 0:
-            state.mark_read_status["message"] = "No unread emails found"
-            state.mark_read_status["progress"] = 100
+            session.mark_read_status["message"] = "No unread emails found"
+            session.mark_read_status["progress"] = 100
         else:
-            state.mark_read_status["message"] = f"Done! Marked {marked} emails as read"
-            state.mark_read_status["progress"] = 100
+            session.mark_read_status["message"] = (
+                f"Done! Marked {marked} emails as read"
+            )
+            session.mark_read_status["progress"] = 100
 
-        state.mark_read_status["done"] = True
+        session.mark_read_status["done"] = True
 
     except Exception as e:
-        state.mark_read_status["error"] = str(e)
-        state.mark_read_status["done"] = True
+        session.mark_read_status["error"] = str(e)
+        session.mark_read_status["done"] = True
 
 
-def get_mark_read_status() -> dict:
+def get_mark_read_status(session: SessionState) -> dict:
     """Get mark-as-read status."""
-    return state.mark_read_status.copy()
+    return session.mark_read_status.copy()

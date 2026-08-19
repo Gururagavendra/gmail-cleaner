@@ -9,48 +9,48 @@ import csv
 import io
 import time
 
-from app.core import state
+from app.core.state import SessionState
 from app.services.auth import get_gmail_service
 
 
-def download_emails_background(senders: list[str]) -> None:
+def download_emails_background(session: SessionState, senders: list[str]) -> None:
     """Download email metadata for selected senders as CSV (background task).
 
     Uses message IDs stored during scan to download only scanned emails.
     """
-    state.reset_download()
+    session.reset_download()
 
     # Validate input
     if not senders or not isinstance(senders, list):
-        state.download_status["done"] = True
-        state.download_status["error"] = "No senders specified"
+        session.download_status["done"] = True
+        session.download_status["error"] = "No senders specified"
         return
 
-    service, error = get_gmail_service()
+    service, error = get_gmail_service(session)
     if error:
-        state.download_status["done"] = True
-        state.download_status["error"] = error
+        session.download_status["done"] = True
+        session.download_status["error"] = error
         return
 
-    state.download_status["message"] = "Collecting emails from scan results..."
+    session.download_status["message"] = "Collecting emails from scan results..."
 
     # Get message IDs from scan results (only emails we actually scanned)
     all_message_ids = []
     for sender in senders:
-        for result in state.delete_scan_results:
+        for result in session.delete_scan_results:
             if result.get("email") == sender:
                 all_message_ids.extend(result.get("message_ids", []))
                 break
 
     if not all_message_ids:
-        state.download_status["progress"] = 100
-        state.download_status["done"] = True
-        state.download_status["error"] = "No emails found in scan results"
+        session.download_status["progress"] = 100
+        session.download_status["done"] = True
+        session.download_status["error"] = "No emails found in scan results"
         return
 
     total_emails = len(all_message_ids)
-    state.download_status["total_emails"] = total_emails
-    state.download_status["message"] = f"Fetching {total_emails} emails..."
+    session.download_status["total_emails"] = total_emails
+    session.download_status["message"] = f"Fetching {total_emails} emails..."
 
     # Helper to decode base64 email content
     def decode_base64_content(data: str) -> str:
@@ -133,9 +133,9 @@ def download_emails_background(senders: list[str]) -> None:
                 )
 
             fetched += len(batch_ids)
-            state.download_status["fetched_count"] = fetched
-            state.download_status["progress"] = int((fetched / total_emails) * 95)
-            state.download_status["message"] = (
+            session.download_status["fetched_count"] = fetched
+            session.download_status["progress"] = int((fetched / total_emails) * 95)
+            session.download_status["message"] = (
                 f"Fetched {fetched}/{total_emails} emails..."
             )
 
@@ -144,13 +144,13 @@ def download_emails_background(senders: list[str]) -> None:
                 time.sleep(0.3)
 
     except Exception as e:
-        state.download_status["done"] = True
-        state.download_status["error"] = f"Error fetching emails: {str(e)}"
+        session.download_status["done"] = True
+        session.download_status["error"] = f"Error fetching emails: {str(e)}"
         return
 
     # Generate CSV
-    state.download_status["progress"] = 98
-    state.download_status["message"] = "Generating CSV..."
+    session.download_status["progress"] = 98
+    session.download_status["message"] = "Generating CSV..."
 
     try:
         output = io.StringIO()
@@ -170,28 +170,30 @@ def download_emails_background(senders: list[str]) -> None:
         writer.writeheader()
         writer.writerows(email_data)
 
-        state.download_status["csv_data"] = output.getvalue()
-        state.download_status["progress"] = 100
-        state.download_status["done"] = True
-        state.download_status["message"] = f"Ready to download {len(email_data)} emails"
+        session.download_status["csv_data"] = output.getvalue()
+        session.download_status["progress"] = 100
+        session.download_status["done"] = True
+        session.download_status["message"] = (
+            f"Ready to download {len(email_data)} emails"
+        )
 
     except Exception as e:
-        state.download_status["done"] = True
-        state.download_status["error"] = f"Error generating CSV: {str(e)}"
+        session.download_status["done"] = True
+        session.download_status["error"] = f"Error generating CSV: {str(e)}"
 
 
-def get_download_status() -> dict:
+def get_download_status(session: SessionState) -> dict:
     """Get download operation status (without CSV data)."""
     return {
-        "progress": state.download_status["progress"],
-        "message": state.download_status["message"],
-        "done": state.download_status["done"],
-        "error": state.download_status["error"],
-        "total_emails": state.download_status["total_emails"],
-        "fetched_count": state.download_status["fetched_count"],
+        "progress": session.download_status["progress"],
+        "message": session.download_status["message"],
+        "done": session.download_status["done"],
+        "error": session.download_status["error"],
+        "total_emails": session.download_status["total_emails"],
+        "fetched_count": session.download_status["fetched_count"],
     }
 
 
-def get_download_csv() -> str | None:
+def get_download_csv(session: SessionState) -> str | None:
     """Get the generated CSV data."""
-    return state.download_status.get("csv_data")
+    return session.download_status.get("csv_data")

@@ -144,17 +144,18 @@ http://localhost:8766
 ```
 
 3. Click **"Sign In"** button in the web UI
-
-4. Check logs for the OAuth URL (only after clicking Sign In!):
-```bash
-docker logs $(docker ps -q --filter ancestor=ghcr.io/gururagavendra/gmail-cleaner)
-```
-Or if you built locally:
+   - A new tab/window opens for Google authorization
+   - If the popup is blocked, check container logs for the OAuth URL:
 ```bash
 docker logs $(docker ps -q --filter name=gmail-cleaner)
 ```
+   - If you are using the published image:
+```bash
+docker logs $(docker ps -q --filter ancestor=ghcr.io/gururagavendra/gmail-cleaner)
+```
+   - Open the URL in your browser to continue
 
-5. Copy the Google OAuth URL from logs, open in browser, and authorize:
+4. Complete Google authorization:
    - Choose your Google account
    - "Google hasn't verified this app" → Click **Continue**
      > This warning appears because you created your own OAuth app (not published to Google). This is expected and safe - you control the app!
@@ -163,22 +164,23 @@ docker logs $(docker ps -q --filter name=gmail-cleaner)
 
 > **🌐 Using a custom domain, remote server, or custom port mapping?** See [Advanced Configuration](#advanced-configuration) for setup instructions.
 
-#### Persisting Authentication (Data Directory)
+#### Authentication Storage (Web UI)
 
-The `docker-compose.yml` includes a `data` directory volume mount that automatically persists your authentication token.
+For the web UI, authentication is stored **per browser** (localStorage) and sent with each request. This enables multi-user usage and avoids a shared server-side token.
+
+- Each browser/device has its own session and token
+- Clearing browser storage will require sign-in again
+
+#### Token File Persistence (Optional)
+
+If you are not using the web UI session storage, `token.json` can be stored on disk. The `docker-compose.yml` includes a `data` directory volume mount for this case.
 
 **How it works:**
 
 - The `./data` directory on your host is mounted to `/app/data` in the container
-- When you authenticate, `token.json` is automatically saved to `/app/data/token.json` inside the container
+- When you authenticate, `token.json` is saved to `/app/data/token.json` inside the container
 - This file is persisted to `./data/token.json` on your host filesystem
-- On subsequent container restarts, your authentication persists automatically
-
-**No manual steps required!**
-
-- ✅ First-time setup: Just run `docker compose up` - the `data` directory is created automatically
-- ✅ Authentication persists: Your token is saved to `./data/token.json` on the host
-- ✅ Container restarts: Your authentication is automatically loaded from the persisted file
+- On subsequent container restarts, your authentication can be loaded from the persisted file
 
 **To reset authentication:**
 
@@ -269,6 +271,8 @@ If you're using **custom port mappings** in Docker (e.g., mapping `18766:8766` a
 
 If you're accessing via a **custom domain** (e.g., `gmail.example.com`) instead of `localhost`:
 
+By default, the app uses the hostname from your browser request (Host or X-Forwarded-Host) to build the OAuth redirect URL. Set `OAUTH_HOST` only if you need to override that value.
+
 > **⚠️ Important**:
 > - Use **Web application** credentials (not Desktop app) for remote server setups. See [Step 7 in Get Google OAuth Credentials](#1-get-google-oauth-credentials).
 > - **IP addresses are NOT allowed** in Google OAuth redirect URIs. You must use a domain name (e.g., `gmail.example.com`), not an IP address (e.g., `192.168.1.100`).
@@ -291,7 +295,7 @@ If you're accessing via a **custom domain** (e.g., `gmail.example.com`) instead 
    - Add: `http://YOUR_DOMAIN:8767/` (or external port if using custom mapping)
    - **Must be a domain name, not an IP address**
 
-2. **Update docker-compose.yml**:
+2. **Optional: Override the redirect host in docker-compose.yml** (only if your proxy does not forward the host correctly):
 
    ```yaml
    environment:
@@ -360,7 +364,7 @@ If you see `OAuth error: (mismatching_state) CSRF Warning`:
 
 #### Docker: "Where do I find the OAuth URL?"
 
-Check the container logs:
+If the browser popup is blocked, check the container logs:
 
 ```bash
 docker logs $(docker ps -q --filter name=gmail-cleaner)

@@ -6,36 +6,36 @@ Functions for archiving emails (removing from inbox).
 
 import time
 
-from app.core import state
+from app.core.state import SessionState
 from app.services.auth import get_gmail_service
 
 
-def archive_emails_background(senders: list[str]):
+def archive_emails_background(session: SessionState, senders: list[str]):
     """Archive emails from selected senders (remove INBOX label)."""
-    state.reset_archive()
+    session.reset_archive()
 
     # Validate input
     if not senders or not isinstance(senders, list):
-        state.archive_status["done"] = True
-        state.archive_status["error"] = "No senders specified"
+        session.archive_status["done"] = True
+        session.archive_status["error"] = "No senders specified"
         return
 
-    state.archive_status["total_senders"] = len(senders)
-    state.archive_status["message"] = "Starting archive..."
+    session.archive_status["total_senders"] = len(senders)
+    session.archive_status["message"] = "Starting archive..."
 
     try:
-        service, error = get_gmail_service()
+        service, error = get_gmail_service(session)
         if error:
-            state.archive_status["error"] = error
-            state.archive_status["done"] = True
+            session.archive_status["error"] = error
+            session.archive_status["done"] = True
             return
 
         total_archived = 0
 
         for i, sender in enumerate(senders):
-            state.archive_status["current_sender"] = i + 1
-            state.archive_status["message"] = f"Archiving emails from {sender}..."
-            state.archive_status["progress"] = int((i / len(senders)) * 100)
+            session.archive_status["current_sender"] = i + 1
+            session.archive_status["message"] = f"Archiving emails from {sender}..."
+            session.archive_status["progress"] = int((i / len(senders)) * 100)
 
             # Find all emails from this sender in INBOX
             query = f"from:{sender} in:inbox"
@@ -72,19 +72,19 @@ def archive_emails_background(senders: list[str]):
                 if (j + 100) % 500 == 0:
                     time.sleep(0.5)
 
-        state.archive_status["progress"] = 100
-        state.archive_status["done"] = True
-        state.archive_status["archived_count"] = total_archived
-        state.archive_status["message"] = (
+        session.archive_status["progress"] = 100
+        session.archive_status["done"] = True
+        session.archive_status["archived_count"] = total_archived
+        session.archive_status["message"] = (
             f"Archived {total_archived} emails from {len(senders)} senders"
         )
 
     except Exception as e:
-        state.archive_status["error"] = f"{e!s}"
-        state.archive_status["done"] = True
-        state.archive_status["message"] = f"Error: {e!s}"
+        session.archive_status["error"] = f"{e!s}"
+        session.archive_status["done"] = True
+        session.archive_status["message"] = f"Error: {e!s}"
 
 
-def get_archive_status() -> dict:
+def get_archive_status(session: SessionState) -> dict:
     """Get archive operation status."""
-    return state.archive_status.copy()
+    return session.archive_status.copy()

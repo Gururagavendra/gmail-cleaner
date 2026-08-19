@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch, mock_open
 
 from google.oauth2.credentials import Credentials
 
+from app.core.state import SessionState
 from app.services import auth
 
 
@@ -58,7 +59,7 @@ class TestTokenCreationAndStorage:
         mock_creds.to_json.return_value = '{"token": "access_token", "refresh_token": "refresh_token", "scopes": ["scope1", "scope2"]}'
         mock_flow_instance.run_local_server.return_value = mock_creds
 
-        service, error = auth.get_gmail_service()
+        service, error = auth.get_gmail_service(session=SessionState())
 
         # OAuth runs in background thread, so we verify the structure
         assert service is None
@@ -141,7 +142,7 @@ class TestTokenCreationAndStorage:
         mock_service.users.return_value.getProfile.return_value = mock_profile
         mock_build.return_value = mock_service
 
-        service, error = auth.get_gmail_service()
+        service, error = auth.get_gmail_service(session=SessionState())
 
         # Verify refresh was called
         assert mock_creds.refresh.called
@@ -220,7 +221,7 @@ class TestTokenValidation:
         mock_service.users.return_value.getProfile.return_value = mock_profile
         mock_build.return_value = mock_service
 
-        service, error = auth.get_gmail_service()
+        service, error = auth.get_gmail_service(session=SessionState())
 
         # Should refresh and return service
         assert mock_creds.refresh.called
@@ -246,7 +247,7 @@ class TestTokenValidation:
 
         mock_creds_class.from_authorized_user_file.return_value = mock_creds
 
-        result = auth.needs_auth_setup()
+        result = auth.needs_auth_setup(session=SessionState())
 
         assert result is True
 
@@ -271,7 +272,7 @@ class TestTokenFileErrors:
             "Invalid token file format"
         )
 
-        result = auth.needs_auth_setup()
+        result = auth.needs_auth_setup(session=SessionState())
 
         assert result is True
 
@@ -292,7 +293,7 @@ class TestTokenFileErrors:
             "Invalid JSON"
         )
 
-        result = auth.needs_auth_setup()
+        result = auth.needs_auth_setup(session=SessionState())
 
         assert result is True
 
@@ -312,7 +313,7 @@ class TestTokenFileErrors:
             "Permission denied"
         )
 
-        result = auth.needs_auth_setup()
+        result = auth.needs_auth_setup(session=SessionState())
 
         assert result is True
 
@@ -364,7 +365,7 @@ class TestTokenFileErrors:
             mock_service.users.return_value.getProfile.return_value = mock_profile
             mock_build.return_value = mock_service
 
-            service, error = auth.get_gmail_service()
+            service, error = auth.get_gmail_service(session=SessionState())
 
             # Should handle write failure gracefully - creds are still valid after refresh
             # so service should be returned despite write failure

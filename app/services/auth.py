@@ -6,12 +6,12 @@ Handles OAuth2 authentication with Gmail API.
 
 import json
 import logging
-import os
 import platform
 import shutil
 import threading
 import time
 from http.server import HTTPServer
+import os
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
@@ -19,15 +19,14 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from app.core import settings, state
+from app.core import settings
+from app.core.state import SessionState, get_session_state
 from app.services.auth_handlers import OAuthCallbackHandler
 
 logger = logging.getLogger(__name__)
 
-
-# Track auth in progress
+# Backward-compatible auth progress flag (deprecated)
 _auth_in_progress = {"active": False}
-
 
 def _is_file_empty(file_path: str) -> bool:
     """Check if a file exists and is empty.
@@ -54,9 +53,30 @@ def is_web_auth_mode() -> bool:
     return settings.web_auth
 
 
-def needs_auth_setup() -> bool:
+def _load_credentials_from_token(token_json: str) -> Credentials | None:
+    """Load credentials from a token JSON string."""
+    try:
+        token_data = json.loads(token_json)
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.warning(f"Invalid token JSON from client: {e}")
+        return None
+
+    try:
+        return Credentials.from_authorized_user_info(token_data, settings.scopes)
+    except Exception as e:
+        logger.warning(f"Failed to load credentials from client token: {e}")
+        return None
+
+
+def needs_auth_setup(
+    session: SessionState | None = None, token_json: str | None = None
+) -> bool:
     """Check if authentication is needed."""
-    if os.path.exists(settings.token_file):
+    session = session or get_session_state("default")
+    token_value = token_json or session.token_json
+    if not token_value and session.allow_token_file and os.path.exists(
+        settings.token_file
+    ):
         # Check if token file is empty
         if _is_file_empty(settings.token_file):
             logger.error(f"Token file {settings.token_file} is empty")
@@ -78,20 +98,32 @@ def needs_auth_setup() -> bool:
         except Exception as e:
             # Unexpected error - log it for debugging
             logger.error(f"Unexpected error checking auth setup: {e}", exc_info=True)
+
+    if not token_value:
+        return True
+
+    creds = _load_credentials_from_token(token_value)
+    if creds and (creds.valid or creds.refresh_token):
+        return False
     return True
 
 
-def get_web_auth_status() -> dict:
+def get_web_auth_status(
+    session: SessionState | None = None, token_json: str | None = None
+) -> dict:
     """Get current web auth status."""
+    session = session or get_session_state("default")
     return {
-        "needs_setup": needs_auth_setup(),
+        "needs_setup": needs_auth_setup(session, token_json),
         "web_auth_mode": is_web_auth_mode(),
         "has_credentials": os.path.exists(settings.credentials_file),
-        "pending_auth_url": state.pending_auth_url.get("url"),
+        "pending_auth_url": session.pending_auth_url.get("url"),
     }
 
 
-def _try_refresh_creds(creds: Credentials) -> Credentials | None:
+def _try_refresh_creds(
+    creds: Credentials, session: SessionState
+) -> Credentials | None:
     """Attempt to refresh expired credentials and save to token file.
 
     Args:
@@ -102,21 +134,25 @@ def _try_refresh_creds(creds: Credentials) -> Credentials | None:
     """
     try:
         creds.refresh(Request())
-        try:
-            with open(settings.token_file, "w") as token:
-                token.write(creds.to_json())
-        except OSError:
-            # Token file write failed - creds are refreshed in memory but not saved
-            logger.exception("Failed to save refreshed token")
+        session.token_json = creds.to_json()
+        session.pending_token_json = session.token_json
+        if session.allow_token_file:
+            try:
+                with open(settings.token_file, "w") as token:
+                    token.write(creds.to_json())
+            except OSError:
+                # Token file write failed - creds are refreshed in memory but not saved
+                logger.exception("Failed to save refreshed token")
         return creds
     except RefreshError as e:
         # Refresh token is invalid or expired
         logger.warning(f"Token refresh failed: {e}")
-        # Clear invalid token file
-        try:
-            os.remove(settings.token_file)
-        except OSError:
-            pass
+        session.token_json = None
+        if session.allow_token_file:
+            try:
+                os.remove(settings.token_file)
+            except OSError:
+                pass
         return None
 
 
@@ -182,15 +218,24 @@ def _get_credentials_path() -> str | None:
     return None
 
 
-def get_gmail_service():
+def get_gmail_service(
+    session: SessionState | None = None,
+    token_json: str | None = None,
+    oauth_host: str | None = None,
+    oauth_scheme: str | None = None,
+):
     """Get authenticated Gmail API service.
 
     Returns:
         tuple: (service, error_message) - service is None if auth needed
     """
+    session = session or get_session_state("default")
     creds = None
 
-    if os.path.exists(settings.token_file):
+    token_value = token_json or session.token_json
+    if token_value:
+        creds = _load_credentials_from_token(token_value)
+    elif session.allow_token_file and os.path.exists(settings.token_file):
         # Check if token file is empty
         if _is_file_empty(settings.token_file):
             logger.error(f"Token file {settings.token_file} is empty")
@@ -216,13 +261,13 @@ def get_gmail_service():
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds = _try_refresh_creds(creds)
+            creds = _try_refresh_creds(creds, session)
 
         # If creds is still None or invalid after refresh attempt, trigger OAuth
         if not creds or not creds.valid:
             # Prevent multiple OAuth attempts (thread-safe check)
             # Note: Small race condition window, but acceptable for this use case
-            if _auth_in_progress.get("active", False):
+            if session.auth_in_progress:
                 return (
                     None,
                     "Sign-in already in progress. Please complete the authorization in your browser.",
@@ -244,6 +289,7 @@ def get_gmail_service():
                 )
 
             # Start OAuth in background thread so server stays responsive
+            session.auth_in_progress = True
             _auth_in_progress["active"] = True
 
             def run_oauth() -> None:
@@ -288,7 +334,17 @@ def get_gmail_service():
 
                     # For Docker: bind to 0.0.0.0 so callback can reach container
                     # For local: bind to localhost for security
-                    bind_address = "0.0.0.0" if is_web_auth_mode() else "localhost"  # nosec B104
+                    effective_host = (
+                        oauth_host or session.oauth_host or settings.oauth_host
+                    )
+                    effective_scheme = (
+                        oauth_scheme or session.oauth_scheme or "http"
+                    )
+                    bind_address = (
+                        "0.0.0.0"
+                        if is_web_auth_mode() or effective_host != "localhost"
+                        else "localhost"
+                    )  # nosec B104
 
                     # Handle custom external port (e.g., Docker port mapping like 18767:8767)
                     # The server listens on the internal port, but the redirect URI uses the external port
@@ -314,32 +370,23 @@ def get_gmail_service():
                             "Port must be between 1 and 65535."
                         )
 
-                    # Check if we should auto-open browser
-                    # In Docker/web mode: don't open browser, print URL to logs
-                    # On Windows/Mac/Linux desktop: auto-open browser
-                    if is_web_auth_mode():
-                        open_browser = False
-                    elif platform.system() == "Windows":
-                        open_browser = True
-                    elif platform.system() == "Darwin":  # macOS
-                        open_browser = True
-                    else:  # Linux
-                        open_browser = bool(
-                            shutil.which("xdg-open") or os.environ.get("DISPLAY")
-                        )
+                    # Always let the client open the authorization URL.
+                    open_browser = False
 
-                    # If external port is different, manually handle OAuth flow
-                    # because run_local_server() constructs redirect URI from port parameter
-                    if redirect_port != settings.oauth_port:
+                    manual_flow = True
+
+                    if manual_flow:
                         # Validate oauth_host is not empty
-                        if not settings.oauth_host or not settings.oauth_host.strip():
+                        if not effective_host or not effective_host.strip():
                             raise ValueError(
                                 "oauth_host cannot be empty when using custom external port. "
                                 "Please set OAUTH_HOST environment variable."
                             )
 
                         # Construct redirect URI using external port
-                        redirect_uri = f"http://{settings.oauth_host}:{redirect_port}/"
+                        redirect_uri = (
+                            f"{effective_scheme}://{effective_host}:{redirect_port}/"
+                        )
                         flow.redirect_uri = redirect_uri
                         logger.info(
                             f"Using custom redirect URI {redirect_uri} "
@@ -361,17 +408,16 @@ def get_gmail_service():
                             )
 
                         # Store OAuth state for CSRF protection
-                        with state.oauth_state_lock:
-                            state.oauth_state["state"] = oauth_state
+                        with session.oauth_state_lock:
+                            session.oauth_state["state"] = oauth_state
                         logger.debug(
                             f"Stored OAuth state for CSRF protection: {oauth_state[:20]}..."
                             if oauth_state and len(oauth_state) > 20
                             else f"Stored OAuth state: {oauth_state}"
                         )
 
-                        # Set pending auth URL for web auth mode
-                        if is_web_auth_mode():
-                            state.pending_auth_url["url"] = authorization_url
+                        # Store pending auth URL so client can open it
+                        session.pending_auth_url["url"] = authorization_url
 
                         # Create a simple HTTP server to handle the callback
                         callback_event = threading.Event()
@@ -386,6 +432,7 @@ def get_gmail_service():
                                 callback_event,
                                 callback_lock,
                                 callback_data,
+                                session,
                                 *args,
                                 **kwargs,
                             )
@@ -418,14 +465,6 @@ def get_gmail_service():
                                 f"Please visit this URL to authorize the application: {authorization_url}"
                             )
                             logger.info(f"OAuth authorization URL: {authorization_url}")
-
-                            if open_browser:
-                                try:
-                                    import webbrowser
-
-                                    webbrowser.open(authorization_url)
-                                except Exception as e:
-                                    logger.warning(f"Failed to open browser: {e}")
 
                             # Wait for the callback (with timeout)
                             timeout = 300  # 5 minutes
@@ -503,7 +542,7 @@ def get_gmail_service():
                         new_creds = flow.run_local_server(
                             port=settings.oauth_port,
                             bind_addr=bind_address,
-                            host=settings.oauth_host,
+                            host=effective_host,
                             open_browser=open_browser,
                             prompt="consent",
                         )
@@ -515,14 +554,21 @@ def get_gmail_service():
                         )
 
                     # Save token with error handling
-                    try:
-                        with open(settings.token_file, "w") as token:
-                            token.write(new_creds.to_json())
-                        print("OAuth complete! Token saved.")
-                    except OSError as e:
-                        logger.error(f"Failed to save token file: {e}", exc_info=True)
-                        print(f"OAuth completed but failed to save token: {e}")
-                        raise  # Re-raise so outer exception handler can log it
+                    session.token_json = new_creds.to_json()
+                    session.pending_token_json = session.token_json
+                    if session.allow_token_file:
+                        try:
+                            with open(settings.token_file, "w") as token:
+                                token.write(new_creds.to_json())
+                            print("OAuth complete! Token saved.")
+                        except OSError as e:
+                            logger.error(
+                                f"Failed to save token file: {e}", exc_info=True
+                            )
+                            print(f"OAuth completed but failed to save token: {e}")
+                            raise  # Re-raise so outer exception handler can log it
+                    else:
+                        print("OAuth complete! Token ready.")
                 except (ValueError, json.JSONDecodeError) as e:
                     # JSON parsing errors from OAuth callback (shouldn't happen if credentials were valid)
                     error_msg = str(e)
@@ -582,10 +628,11 @@ def get_gmail_service():
                         print(f"OAuth error: {e}")
                 finally:
                     # Always reset auth state, even on error
+                    session.auth_in_progress = False
                     _auth_in_progress["active"] = False
-                    state.pending_auth_url["url"] = None
-                    with state.oauth_state_lock:
-                        state.oauth_state["state"] = None
+                    session.pending_auth_url["url"] = None
+                    with session.oauth_state_lock:
+                        session.oauth_state["state"] = None
 
             oauth_thread = threading.Thread(target=run_oauth, daemon=True)
             oauth_thread.start()
@@ -608,25 +655,31 @@ def get_gmail_service():
 
     try:
         profile = service.users().getProfile(userId="me").execute()
-        state.current_user["email"] = profile.get("emailAddress", "Unknown")
-        state.current_user["logged_in"] = True
+        session.current_user["email"] = profile.get("emailAddress", "Unknown")
+        session.current_user["logged_in"] = True
     except Exception:
-        state.current_user["email"] = "Unknown"
-        state.current_user["logged_in"] = True
+        session.current_user["email"] = "Unknown"
+        session.current_user["logged_in"] = True
 
     return service, None
 
 
-def sign_out() -> dict:
-    """Sign out by removing the token file."""
-    if os.path.exists(settings.token_file):
+def sign_out(session: SessionState | None = None) -> dict:
+    """Sign out by clearing session credentials and state."""
+    session = session or get_session_state("default")
+    session.token_json = None
+    session.pending_token_json = None
+    session.current_user = {"email": None, "logged_in": False}
+    session.reset_scan()
+    session.reset_delete_scan()
+    session.reset_mark_read()
+    session.reset_delete_bulk()
+    session.reset_download()
+    session.reset_label_operation()
+    session.reset_archive()
+    session.reset_important()
+    if session.allow_token_file and os.path.exists(settings.token_file):
         os.remove(settings.token_file)
-
-    # Reset state
-    state.current_user = {"email": None, "logged_in": False}
-    state.reset_scan()
-    state.reset_delete_scan()
-    state.reset_mark_read()
 
     print("Signed out - results cleared")
     return {
@@ -636,9 +689,36 @@ def sign_out() -> dict:
     }
 
 
-def check_login_status() -> dict:
+def check_login_status(
+    session: SessionState | None = None, token_json: str | None = None
+) -> dict:
     """Check if user is logged in and get their email."""
-    if os.path.exists(settings.token_file):
+    session = session or get_session_state("default")
+    token_value = token_json or session.pending_token_json or session.token_json
+    if token_value:
+        creds = _load_credentials_from_token(token_value)
+        try:
+            if creds and creds.valid:
+                service = build("gmail", "v1", credentials=creds)
+                profile = service.users().getProfile(userId="me").execute()
+                session.current_user["email"] = profile.get("emailAddress", "Unknown")
+                session.current_user["logged_in"] = True
+                session.token_json = token_value
+                return session.current_user.copy()
+            if creds and creds.expired and creds.refresh_token:
+                refreshed_creds = _try_refresh_creds(creds, session)
+                if refreshed_creds:
+                    service = build("gmail", "v1", credentials=refreshed_creds)
+                    profile = service.users().getProfile(userId="me").execute()
+                    session.current_user["email"] = profile.get(
+                        "emailAddress", "Unknown"
+                    )
+                    session.current_user["logged_in"] = True
+                    return session.current_user.copy()
+        except Exception as e:
+            # API errors, network issues, etc.
+            logger.error(f"Error checking login status: {e}", exc_info=True)
+    elif session.allow_token_file and os.path.exists(settings.token_file):
         # Check if token file is empty
         if _is_file_empty(settings.token_file):
             logger.error(f"Token file {settings.token_file} is empty")
@@ -654,19 +734,19 @@ def check_login_status() -> dict:
                 if creds and creds.valid:
                     service = build("gmail", "v1", credentials=creds)
                     profile = service.users().getProfile(userId="me").execute()
-                    state.current_user["email"] = profile.get("emailAddress", "Unknown")
-                    state.current_user["logged_in"] = True
-                    return state.current_user.copy()
+                    session.current_user["email"] = profile.get("emailAddress", "Unknown")
+                    session.current_user["logged_in"] = True
+                    return session.current_user.copy()
                 elif creds and creds.expired and creds.refresh_token:
-                    refreshed_creds = _try_refresh_creds(creds)
+                    refreshed_creds = _try_refresh_creds(creds, session)
                     if refreshed_creds:
                         service = build("gmail", "v1", credentials=refreshed_creds)
                         profile = service.users().getProfile(userId="me").execute()
-                        state.current_user["email"] = profile.get(
+                        session.current_user["email"] = profile.get(
                             "emailAddress", "Unknown"
                         )
-                        state.current_user["logged_in"] = True
-                        return state.current_user.copy()
+                        session.current_user["logged_in"] = True
+                        return session.current_user.copy()
             except (ValueError, OSError) as e:
                 # Token file is invalid/corrupted
                 logger.warning(f"Failed to load or refresh credentials: {e}")
@@ -679,6 +759,6 @@ def check_login_status() -> dict:
                 # API errors, network issues, etc.
                 logger.error(f"Error checking login status: {e}", exc_info=True)
 
-    state.current_user["email"] = None
-    state.current_user["logged_in"] = False
-    return state.current_user.copy()
+    session.current_user["email"] = None
+    session.current_user["logged_in"] = False
+    return session.current_user.copy()
