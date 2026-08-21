@@ -102,6 +102,19 @@ class AppState:
             "current_sender": 0,
         }
 
+        # Job state (long-running bulk operations)
+        self.job_status: dict = {
+            "running": False,
+            "cancelled": False,
+            "done": False,
+            "error": None,
+            "message": "Ready",
+            "action": None,
+            "batches_processed": 0,
+            "emails_affected": 0,
+            "progress": 0,
+        }
+
     def reset_scan(self):
         """Reset scan state."""
         self.scan_results = []
@@ -190,6 +203,20 @@ class AppState:
             "affected_count": 0,
             "total_senders": 0,
             "current_sender": 0,
+        }
+
+    def reset_job(self):
+        """Reset job state."""
+        self.job_status = {
+            "running": False,
+            "cancelled": False,
+            "done": False,
+            "error": None,
+            "message": "Ready",
+            "action": None,
+            "batches_processed": 0,
+            "emails_affected": 0,
+            "progress": 0,
         }
 
 

@@ -187,6 +187,9 @@ GmailCleaner.Scanner = {
                 </div>
                 <div class="result-actions">
                     ${actionButton}
+                    <button class="unsub-btn delete-btn" id="del-${i}" onclick="GmailCleaner.Scanner.deleteEmails(${i})">
+                        Delete
+                    </button>
                 </div>
             `;
             resultsList.appendChild(item);
@@ -307,6 +310,206 @@ GmailCleaner.Scanner = {
         }
     },
 
+    showDeleteScopeDialog(scannedCount, domain) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'delete-overlay';
+            overlay.id = 'deleteScopeOverlay';
+            overlay.innerHTML = `
+                <div class="delete-overlay-content" style="gap:16px">
+                    <h3>Delete emails from ${GmailCleaner.UI.escapeHtml(domain)}?</h3>
+                    <p style="color:#5f6368;font-size:14px">Choose how many emails to delete. All deleted emails are moved to Trash.</p>
+                    <div style="display:flex;flex-direction:column;gap:10px;width:100%">
+                        <button class="btn btn-primary" id="deleteScopeScanned" style="width:100%">
+                            Delete ${scannedCount} emails found in scan
+                        </button>
+                        <button class="btn btn-secondary" id="deleteScopeAll" style="width:100%">
+                            Delete all emails from this sender
+                        </button>
+                        <button class="btn" id="deleteScopeCancel" style="width:100%;margin-top:4px">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            document.getElementById('deleteScopeScanned').onclick = () => { overlay.remove(); resolve('scanned'); };
+            document.getElementById('deleteScopeAll').onclick = () => { overlay.remove(); resolve('all'); };
+            document.getElementById('deleteScopeCancel').onclick = () => { overlay.remove(); resolve(null); };
+        });
+    },
+
+    async deleteEmails(index) {
+        const r = GmailCleaner.results[index];
+        const btn = document.getElementById('del-' + index);
+
+        const scope = await this.showDeleteScopeDialog(r.count, r.domain);
+        if (!scope) return;
+
+        btn.disabled = true;
+        btn.classList.add('btn-deleting');
+        btn.innerHTML = `
+            <svg class="spinner" viewBox="0 0 24 24" width="14" height="14">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60" stroke-linecap="round"/>
+            </svg>
+            Deleting...
+        `;
+
+        try {
+            let response;
+            if (scope === 'scanned') {
+                if (!r.message_ids || r.message_ids.length === 0) throw new Error('No scanned message IDs to delete');
+                response = await fetch('/api/delete-by-ids', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message_ids: r.message_ids })
+                });
+            } else {
+                response = await fetch('/api/delete-emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sender: r.domain })
+                });
+            }
+            const result = await response.json();
+
+            if (result.success) {
+                btn.classList.remove('btn-deleting');
+                btn.innerHTML = '✓ Deleted!';
+                btn.classList.add('success');
+                GmailCleaner.UI.showSuccessToast(`Moved ${result.deleted} emails from ${r.domain} to Trash.`);
+            } else {
+                btn.classList.remove('btn-deleting');
+                btn.disabled = false;
+                btn.innerHTML = 'Delete';
+                GmailCleaner.UI.showErrorToast('Error: ' + result.message);
+            }
+        } catch (error) {
+            btn.classList.remove('btn-deleting');
+            btn.disabled = false;
+            btn.innerHTML = 'Delete';
+            GmailCleaner.UI.showErrorToast('Error: ' + error.message);
+        }
+    },
+
+    async deleteSelected() {
+        // Snapshot both result data and button DOM references before any async ops.
+        // Re-querying the DOM after awaits is unreliable if displayResults() is called
+        // in the background (e.g. from pollProgress), which recreates all elements.
+        const items = [];
+        document.querySelectorAll('.result-cb:checked').forEach(cb => {
+            const index = parseInt(cb.dataset.index);
+            const btn = document.getElementById('del-' + index);
+            if (!btn || !btn.classList.contains('success')) {
+                const r = GmailCleaner.results[index];
+                if (r) items.push({ r, btn });
+            }
+        });
+
+        if (items.length === 0) {
+            alert('No items selected!');
+            return;
+        }
+
+        const scannedTotal = items.reduce((sum, { r }) => sum + (r.count || 0), 0);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'delete-overlay';
+        overlay.id = 'deleteScopeOverlay';
+        overlay.innerHTML = `
+            <div class="delete-overlay-content" style="gap:16px">
+                <h3>Delete emails from ${items.length} sender${items.length > 1 ? 's' : ''}?</h3>
+                <p style="color:#5f6368;font-size:14px">Choose how many emails to delete. All deleted emails are moved to Trash.</p>
+                <div style="display:flex;flex-direction:column;gap:10px;width:100%">
+                    <button class="btn btn-primary" id="deleteScopeScanned" style="width:100%">
+                        Delete ${scannedTotal} emails found in scan
+                    </button>
+                    <button class="btn btn-secondary" id="deleteScopeAll" style="width:100%">
+                        Delete all emails from these senders
+                    </button>
+                    <button class="btn" id="deleteScopeCancel" style="width:100%;margin-top:4px">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const scope = await new Promise((resolve) => {
+            document.getElementById('deleteScopeScanned').onclick = () => { overlay.remove(); resolve('scanned'); };
+            document.getElementById('deleteScopeAll').onclick = () => { overlay.remove(); resolve('all'); };
+            document.getElementById('deleteScopeCancel').onclick = () => { overlay.remove(); resolve(null); };
+        });
+
+        if (!scope) return;
+
+        // Set ALL buttons to "Deleting..." synchronously before any awaits,
+        // so the visual state is consistent regardless of subsequent DOM changes.
+        const spinnerHTML = `
+            <svg class="spinner" viewBox="0 0 24 24" width="14" height="14">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="60" stroke-linecap="round"/>
+            </svg>
+            Deleting...
+        `;
+        for (const { btn } of items) {
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('btn-deleting');
+                btn.innerHTML = spinnerHTML;
+            }
+        }
+
+        let deleted = 0;
+        for (const { r, btn } of items) {
+            try {
+                let response;
+                if (scope === 'scanned') {
+                    if (!r.message_ids || r.message_ids.length === 0) continue;
+                    response = await fetch('/api/delete-by-ids', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message_ids: r.message_ids })
+                    });
+                } else {
+                    response = await fetch('/api/delete-emails', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sender: r.domain })
+                    });
+                }
+                const result = await response.json();
+
+                if (result.success) {
+                    deleted += result.deleted;
+                    if (btn) {
+                        btn.classList.remove('btn-deleting');
+                        btn.innerHTML = '✓ Deleted!';
+                        btn.classList.add('success');
+                    }
+                } else {
+                    if (btn) {
+                        btn.classList.remove('btn-deleting');
+                        btn.disabled = false;
+                        btn.innerHTML = 'Delete';
+                    }
+                }
+            } catch {
+                if (btn) {
+                    btn.classList.remove('btn-deleting');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Delete';
+                }
+            }
+        }
+
+        if (deleted > 0) {
+            GmailCleaner.UI.showSuccessToast(`Moved ${deleted} emails to Trash.`);
+        } else {
+            GmailCleaner.UI.showErrorToast('No emails were deleted.');
+        }
+    },
+
     exportResults() {
         if (!GmailCleaner.results.length) {
             alert('No results to export');
@@ -332,4 +535,5 @@ GmailCleaner.Scanner = {
 function startScan() { GmailCleaner.Scanner.startScan(); }
 function toggleSelectAll() { GmailCleaner.Scanner.toggleSelectAll(); }
 function unsubscribeSelected() { GmailCleaner.Scanner.unsubscribeSelected(); }
+function deleteSelectedSubscriptions() { GmailCleaner.Scanner.deleteSelected(); }
 function exportResults() { GmailCleaner.Scanner.exportResults(); }
