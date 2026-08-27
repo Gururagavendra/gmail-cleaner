@@ -145,21 +145,24 @@ http://localhost:8766
 
 3. Click **"Sign In"** button in the web UI
 
-4. Check logs for the OAuth URL (only after clicking Sign In!):
-```bash
-docker logs $(docker ps -q --filter ancestor=ghcr.io/gururagavendra/gmail-cleaner)
-```
-Or if you built locally:
-```bash
-docker logs $(docker ps -q --filter name=gmail-cleaner)
-```
+4. The app shows a **"Continue to Google"** button as soon as the authorization
+   URL is ready. It also tries to open it in a new tab automatically - if your
+   browser blocks the popup, just click the button.
 
-5. Copy the Google OAuth URL from logs, open in browser, and authorize:
+   Signing in from a different machine than the one running the browser? Click
+   **"Signing in on another device?"** to reveal the raw URL and copy it.
+
+5. Authorize in the Google consent screen:
    - Choose your Google account
    - "Google hasn't verified this app" → Click **Continue**
      > This warning appears because you created your own OAuth app (not published to Google). This is expected and safe - you control the app!
    - Grant permissions → Click **Continue**
    - Done! You'll see "Authentication flow has completed"
+
+> The authorization URL is still printed to the container logs as a fallback:
+> ```bash
+> docker logs $(docker ps -q --filter name=gmail-cleaner)
+> ```
 
 > **🌐 Using a custom domain, remote server, or custom port mapping?** See [Advanced Configuration](#advanced-configuration) for setup instructions.
 
