@@ -29,6 +29,49 @@ logger = logging.getLogger(__name__)
 _auth_in_progress = {"active": False}
 
 
+def _publish_authorization_url(flow) -> None:
+    """Publish the consent URL that ``flow.run_local_server()`` builds internally.
+
+    ``run_local_server()`` constructs the authorization URL itself and only
+    prints it, so the URL is unreachable from the web UI. It builds that URL by
+    calling the public :meth:`Flow.authorization_url`, so wrapping that method
+    lets us record the URL in :data:`state.pending_auth_url` without
+    reimplementing the flow.
+
+    If a future version of ``google-auth-oauthlib`` stops routing through
+    :meth:`authorization_url`, nothing breaks: the URL simply stays ``None`` and
+    the behaviour falls back to today's log-only output.
+
+    Args:
+        flow: The OAuth flow whose authorization URL should be published.
+    """
+    original_authorization_url = flow.authorization_url
+
+    def capture_authorization_url(*args, **kwargs):
+        """Call through to the real ``authorization_url`` and publish its URL.
+
+        Args:
+            *args: Positional arguments forwarded unchanged.
+            **kwargs: Keyword arguments forwarded unchanged.
+
+        Returns:
+            Whatever the wrapped method returned, untouched - publishing is a
+            side effect and never changes the flow's own behaviour.
+        """
+        result = original_authorization_url(*args, **kwargs)
+        try:
+            state.pending_auth_url["url"] = result[0]
+        except (TypeError, IndexError, KeyError):
+            # Unexpected return shape - keep the flow working, just unpublished.
+            logger.warning(
+                "Could not read the authorization URL from the OAuth flow; "
+                "it will only be available in the logs."
+            )
+        return result
+
+    flow.authorization_url = capture_authorization_url
+
+
 def _is_file_empty(file_path: str) -> bool:
     """Check if a file exists and is empty.
 
@@ -369,9 +412,11 @@ def get_gmail_service():
                             else f"Stored OAuth state: {oauth_state}"
                         )
 
-                        # Set pending auth URL for web auth mode
-                        if is_web_auth_mode():
-                            state.pending_auth_url["url"] = authorization_url
+                        # Publish the URL so the web UI can show it. Useful in
+                        # every mode: in web auth mode no browser is opened at
+                        # all, and on a headless desktop the auto-open can
+                        # silently fail.
+                        state.pending_auth_url["url"] = authorization_url
 
                         # Create a simple HTTP server to handle the callback
                         callback_event = threading.Event()
@@ -500,6 +545,7 @@ def get_gmail_service():
                                     )
                     else:
                         # Use standard run_local_server when ports match
+                        _publish_authorization_url(flow)
                         new_creds = flow.run_local_server(
                             port=settings.oauth_port,
                             bind_addr=bind_address,
