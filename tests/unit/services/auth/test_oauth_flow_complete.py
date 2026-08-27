@@ -4,6 +4,7 @@ Tests for Complete OAuth Flow Scenarios
 Tests for successful OAuth flows and edge cases not covered in existing tests.
 """
 
+import threading
 from unittest.mock import Mock, patch, mock_open
 
 
@@ -336,3 +337,154 @@ class TestOAuthFlowErrors:
         # Note: This tests the structure, actual reset happens in background thread
         assert service is None
         assert error is not None
+
+
+class TestConfiguredRedirectUri:
+    """Tests for the OAUTH_REDIRECT_URI override (reverse proxy / TLS termination)."""
+
+    @staticmethod
+    def _abort_after_redirect_uri(mock_flow_instance):
+        """Stop the flow right after redirect_uri is set, and signal when that happened.
+
+        run_oauth() always runs on a background thread, so the test needs a
+        happens-before edge rather than relying on it finishing in time.
+        """
+        reached = threading.Event()
+
+        def fake_authorization_url(**_kwargs):
+            reached.set()
+            # A falsy URL makes run_oauth raise ValueError and unwind cleanly,
+            # which is enough: redirect_uri is already assigned by this point.
+            return (None, None)
+
+        mock_flow_instance.authorization_url.side_effect = fake_authorization_url
+        return reached
+
+    @patch("app.services.auth.settings")
+    @patch("app.services.auth._is_file_empty", return_value=False)
+    @patch("app.services.auth.os.path.exists")
+    @patch("app.services.auth.InstalledAppFlow")
+    @patch("app.services.auth._auth_in_progress", {"active": False})
+    @patch("app.services.auth.is_web_auth_mode", return_value=True)
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data='{"web": {"client_id": "test", "client_secret": "secret"}}',
+    )
+    def test_configured_redirect_uri_is_used_verbatim(
+        self,
+        mock_file,
+        mock_web_auth,
+        mock_flow,
+        mock_exists,
+        mock_is_file_empty,
+        mock_settings,
+    ):
+        """OAUTH_REDIRECT_URI should be used as-is, keeping https and dropping the port."""
+        mock_settings.credentials_file = "credentials.json"
+        mock_settings.token_file = "token.json"
+        mock_settings.scopes = ["scope1", "scope2"]
+        mock_settings.oauth_port = 8767
+        mock_settings.oauth_external_port = None
+        mock_settings.oauth_host = "gmail.example.com"
+        mock_settings.oauth_redirect_uri = "https://gmail.example.com/"
+
+        mock_exists.side_effect = lambda path: "credentials.json" in str(path)
+
+        mock_flow_instance = Mock()
+        mock_flow.from_client_secrets_file.return_value = mock_flow_instance
+        reached = self._abort_after_redirect_uri(mock_flow_instance)
+
+        auth.get_gmail_service()
+
+        assert reached.wait(timeout=5), "OAuth flow never reached authorization_url"
+        assert mock_flow_instance.redirect_uri == "https://gmail.example.com/"
+        # run_local_server would rebuild the URI as http://host:port/ and break token exchange
+        mock_flow_instance.run_local_server.assert_not_called()
+
+    @patch("app.services.auth.settings")
+    @patch("app.services.auth._is_file_empty", return_value=False)
+    @patch("app.services.auth.os.path.exists")
+    @patch("app.services.auth.InstalledAppFlow")
+    @patch("app.services.auth._auth_in_progress", {"active": False})
+    @patch("app.services.auth.is_web_auth_mode", return_value=True)
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data='{"web": {"client_id": "test", "client_secret": "secret"}}',
+    )
+    def test_configured_redirect_uri_overrides_external_port(
+        self,
+        mock_file,
+        mock_web_auth,
+        mock_flow,
+        mock_exists,
+        mock_is_file_empty,
+        mock_settings,
+    ):
+        """OAUTH_REDIRECT_URI should win over OAUTH_EXTERNAL_PORT composition."""
+        mock_settings.credentials_file = "credentials.json"
+        mock_settings.token_file = "token.json"
+        mock_settings.scopes = ["scope1", "scope2"]
+        mock_settings.oauth_port = 8767
+        mock_settings.oauth_external_port = 18767
+        mock_settings.oauth_host = "gmail.example.com"
+        mock_settings.oauth_redirect_uri = "https://gmail.example.com/oauth2/callback"
+
+        mock_exists.side_effect = lambda path: "credentials.json" in str(path)
+
+        mock_flow_instance = Mock()
+        mock_flow.from_client_secrets_file.return_value = mock_flow_instance
+        reached = self._abort_after_redirect_uri(mock_flow_instance)
+
+        auth.get_gmail_service()
+
+        assert reached.wait(timeout=5), "OAuth flow never reached authorization_url"
+        assert (
+            mock_flow_instance.redirect_uri
+            == "https://gmail.example.com/oauth2/callback"
+        )
+
+    @patch("app.services.auth.settings")
+    @patch("app.services.auth._is_file_empty", return_value=False)
+    @patch("app.services.auth.os.path.exists")
+    @patch("app.services.auth.InstalledAppFlow")
+    @patch("app.services.auth._auth_in_progress", {"active": False})
+    @patch("app.services.auth.is_web_auth_mode", return_value=False)
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data='{"installed": {"client_id": "test", "client_secret": "secret"}}',
+    )
+    def test_unset_redirect_uri_keeps_run_local_server(
+        self,
+        mock_file,
+        mock_web_auth,
+        mock_flow,
+        mock_exists,
+        mock_is_file_empty,
+        mock_settings,
+    ):
+        """With OAUTH_REDIRECT_URI unset the original run_local_server path is kept."""
+        mock_settings.credentials_file = "credentials.json"
+        mock_settings.token_file = "token.json"
+        mock_settings.scopes = ["scope1", "scope2"]
+        mock_settings.oauth_port = 8767
+        mock_settings.oauth_external_port = None
+        mock_settings.oauth_host = "localhost"
+        mock_settings.oauth_redirect_uri = None
+
+        mock_exists.side_effect = lambda path: "credentials.json" in str(path)
+
+        mock_flow_instance = Mock()
+        mock_flow.from_client_secrets_file.return_value = mock_flow_instance
+
+        started = threading.Event()
+        mock_flow_instance.run_local_server.side_effect = (
+            lambda **_kwargs: started.set() or Mock()
+        )
+
+        auth.get_gmail_service()
+
+        assert started.wait(timeout=5), "run_local_server was never called"
+        mock_flow_instance.authorization_url.assert_not_called()

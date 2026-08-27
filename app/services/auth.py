@@ -298,6 +298,16 @@ def get_gmail_service():
                         else settings.oauth_port
                     )
 
+                    # An explicit redirect URI wins over host/port composition. This is the
+                    # only way to express a scheme other than http, or a URI with no port at
+                    # all - both of which a TLS-terminating reverse proxy needs.
+                    configured_redirect_uri = (
+                        settings.oauth_redirect_uri.strip()
+                        if isinstance(settings.oauth_redirect_uri, str)
+                        and settings.oauth_redirect_uri.strip()
+                        else None
+                    )
+
                     # Validate port ranges (1-65535)
                     if not isinstance(settings.oauth_port, int) or not (
                         1 <= settings.oauth_port <= 65535
@@ -328,23 +338,38 @@ def get_gmail_service():
                             shutil.which("xdg-open") or os.environ.get("DISPLAY")
                         )
 
-                    # If external port is different, manually handle OAuth flow
-                    # because run_local_server() constructs redirect URI from port parameter
-                    if redirect_port != settings.oauth_port:
-                        # Validate oauth_host is not empty
-                        if not settings.oauth_host or not settings.oauth_host.strip():
-                            raise ValueError(
-                                "oauth_host cannot be empty when using custom external port. "
-                                "Please set OAUTH_HOST environment variable."
+                    # Drive the OAuth flow by hand whenever the redirect URI is not what
+                    # run_local_server() would build, since it always derives
+                    # "http://{host}:{port}/" from its own arguments - and uses that same
+                    # value again at token exchange, where a mismatch is fatal.
+                    if configured_redirect_uri or redirect_port != settings.oauth_port:
+                        if configured_redirect_uri:
+                            redirect_uri = configured_redirect_uri
+                            logger.info(
+                                f"Using configured redirect URI {redirect_uri} "
+                                f"(callback server listening on internal port {settings.oauth_port})"
+                            )
+                        else:
+                            # Validate oauth_host is not empty
+                            if (
+                                not settings.oauth_host
+                                or not settings.oauth_host.strip()
+                            ):
+                                raise ValueError(
+                                    "oauth_host cannot be empty when using custom external port. "
+                                    "Please set OAUTH_HOST environment variable."
+                                )
+
+                            # Construct redirect URI using external port
+                            redirect_uri = (
+                                f"http://{settings.oauth_host}:{redirect_port}/"
+                            )
+                            logger.info(
+                                f"Using custom redirect URI {redirect_uri} "
+                                f"(internal port: {settings.oauth_port}, external port: {redirect_port})"
                             )
 
-                        # Construct redirect URI using external port
-                        redirect_uri = f"http://{settings.oauth_host}:{redirect_port}/"
                         flow.redirect_uri = redirect_uri
-                        logger.info(
-                            f"Using custom redirect URI {redirect_uri} "
-                            f"(internal port: {settings.oauth_port}, external port: {redirect_port})"
-                        )
 
                         # Manually handle OAuth flow with custom redirect URI
                         authorization_url, oauth_state = flow.authorization_url(
