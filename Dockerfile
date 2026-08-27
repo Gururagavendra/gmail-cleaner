@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-alpine
 
 WORKDIR /app
 
@@ -8,8 +8,11 @@ ENV PYTHONUNBUFFERED=1
 # Enable web auth mode for Docker (binds OAuth to 0.0.0.0)
 ENV WEB_AUTH=true
 
-# Install uv for faster package management
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Pick up security updates published after the base image was tagged
+RUN apk upgrade --no-cache
+
+# Install uv for faster package management (musl build, to match the alpine base)
+COPY --from=ghcr.io/astral-sh/uv:alpine /usr/local/bin/uv /usr/local/bin/uv
 
 # Copy dependency files and README (required by pyproject.toml)
 COPY pyproject.toml uv.lock README.md ./
