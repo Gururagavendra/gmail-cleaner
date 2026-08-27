@@ -278,6 +278,7 @@ If you're accessing via a **custom domain** (e.g., `gmail.example.com`) instead 
 - ✅ `http://localhost:8767/` (for local access)
 - ✅ `http://gmail.example.com:8767/` (custom domain)
 - ✅ `http://mygmail.duckdns.org:8767/` (dynamic DNS)
+- ✅ `https://gmail.example.com/` (HTTPS reverse proxy — requires [`OAUTH_REDIRECT_URI`](#3-for-https-with-reverse-proxy))
 - ❌ `http://192.168.1.100:8767/` (IP addresses not allowed)
 - ❌ `http://10.0.0.5:8767/` (private IPs not allowed)
 
@@ -306,10 +307,35 @@ If you're accessing via a **custom domain** (e.g., `gmail.example.com`) instead 
    > - Use a domain name, NOT an IP address (e.g., ~~`192.168.1.100`~~)
 
 3. **For HTTPS with reverse proxy**:
+
+   Set `OAUTH_REDIRECT_URI` to the exact URL your proxy serves. It is used verbatim, so you
+   can keep `https` and drop the port. `OAUTH_HOST` and `OAUTH_EXTERNAL_PORT` are ignored
+   when it is set:
+
+   ```yaml
+   environment:
+     - WEB_AUTH=true
+     - OAUTH_REDIRECT_URI=https://gmail.example.com/
+   ```
+
+   - Register that same URL, character for character, as the **Authorized redirect URI** in Google Cloud
+   - Point your proxy at container port **8767** for that URL — it serves the OAuth callback
+   - Proxy port 8766 (web UI) as usual
+
+   > **Why this setting exists**: without it the callback URL is always built as
+   > `http://HOST:PORT/`. That URL is sent to Google twice — once to start authorization, and
+   > again to exchange the code for a token — so editing it by hand in the browser only moves
+   > the failure to the token exchange, which fails with `redirect_uri_mismatch`.
+
+   <details>
+   <summary>Without <code>OAUTH_REDIRECT_URI</code> (plain HTTP passthrough)</summary>
+
    - The OAuth callback uses HTTP on port 8767 internally
    - Your reverse proxy should forward port 8767 for the OAuth callback
    - The **Authorized redirect URI** in Google Cloud must be `http://YOUR_DOMAIN:8767/` (HTTP, not HTTPS) or use the external port if mapped
    - Proxy both port 8766 (app) and port 8767 (OAuth callback) through your reverse proxy
+
+   </details>
 
 ## Troubleshooting
 
@@ -338,6 +364,24 @@ Your app is missing test users in the OAuth setup:
 This is normal for personal OAuth apps! Click **Continue** to proceed.
 
 This warning appears because your app isn't published to Google - which is exactly what we want for privacy!
+
+#### "OAuth error: Redirect URI mismatch" behind an HTTPS reverse proxy
+
+If the URL in the logs is `http://YOUR_DOMAIN:8767/` but your proxy serves the app over
+HTTPS on port 443, set the callback URL explicitly instead of editing it in the browser:
+
+```yaml
+environment:
+  - OAUTH_REDIRECT_URI=https://gmail.example.com/
+```
+
+Then register exactly that URL under **Authorized redirect URIs** in Google Cloud, and make
+sure your proxy forwards it to container port 8767.
+
+> **Why editing the URL by hand doesn't work**: the callback URL is sent to Google twice —
+> once to start authorization and again to exchange the code for a token. Changing it only
+> in the browser leaves the app exchanging the code against the original URL, so Google
+> rejects the second call with `redirect_uri_mismatch`.
 
 #### OAuth CSRF Error / State Mismatch
 
