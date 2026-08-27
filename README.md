@@ -149,8 +149,17 @@ http://localhost:8766
    URL is ready. It also tries to open it in a new tab automatically - if your
    browser blocks the popup, just click the button.
 
-   Signing in from a different machine than the one running the browser? Click
+   Browsing from a different machine than the one running the container? Click
    **"Signing in on another device?"** to reveal the raw URL and copy it.
+
+   > **This only completes the sign-in if `OAUTH_HOST` names a host that the
+   > other machine can actually reach**, with the callback port reachable there
+   > too. With the default `OAUTH_HOST=localhost`, Google sends the browser back
+   > to `http://localhost:8767/` - which on any other machine is *that* machine,
+   > so the container never receives the authorization code. Consent will appear
+   > to succeed and the sign-in will silently not finish. Either set `OAUTH_HOST`
+   > to a resolvable domain (see [Advanced Configuration](#advanced-configuration))
+   > or complete the sign-in from the machine running the container.
 
 5. Authorize in the Google consent screen:
    - Choose your Google account

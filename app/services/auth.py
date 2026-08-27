@@ -48,6 +48,16 @@ def _publish_authorization_url(flow) -> None:
     original_authorization_url = flow.authorization_url
 
     def capture_authorization_url(*args, **kwargs):
+        """Call through to the real ``authorization_url`` and publish its URL.
+
+        Args:
+            *args: Positional arguments forwarded unchanged.
+            **kwargs: Keyword arguments forwarded unchanged.
+
+        Returns:
+            Whatever the wrapped method returned, untouched - publishing is a
+            side effect and never changes the flow's own behaviour.
+        """
         result = original_authorization_url(*args, **kwargs)
         try:
             state.pending_auth_url["url"] = result[0]

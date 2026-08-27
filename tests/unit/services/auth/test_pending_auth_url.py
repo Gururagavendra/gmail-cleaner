@@ -27,9 +27,11 @@ class _InlineThread:
     """
 
     def __init__(self, target=None, daemon=None, **kwargs):
+        """Record the target callable, ignoring the threading-specific kwargs."""
         self._target = target
 
     def start(self):
+        """Run the target immediately on the calling thread."""
         self._target()
 
 
@@ -42,6 +44,14 @@ def reset_pending_auth_url():
 
 
 def _configure_settings(mock_settings, external_port=None):
+    """Populate a mocked ``settings`` with the attributes the auth flow reads.
+
+    Args:
+        mock_settings: The patched ``app.services.auth.settings`` mock.
+        external_port: Value for ``oauth_external_port``. Leave ``None`` to take
+            the ``run_local_server`` path; set it to force the manual
+            custom-redirect-port path.
+    """
     mock_settings.credentials_file = "credentials.json"
     mock_settings.token_file = "token.json"
     mock_settings.scopes = ["scope1"]
@@ -51,6 +61,11 @@ def _configure_settings(mock_settings, external_port=None):
 
 
 def _only_credentials_exist(path):
+    """Fake ``os.path.exists`` for a first-run state.
+
+    Reports ``credentials.json`` as present and ``token.json`` as missing, which
+    is what drives ``get_gmail_service`` into a fresh authorization flow.
+    """
     if "token.json" in str(path):
         return False
     if "credentials.json" in str(path):
@@ -86,6 +101,11 @@ class TestRunLocalServerPath:
         seen = {}
 
         def fake_run_local_server(**kwargs):
+            """Stand in for ``run_local_server``, capturing the published URL.
+
+            Calls ``authorization_url`` the way the real library does, then
+            records what the UI would have seen at that moment.
+            """
             # Mirror what google-auth-oauthlib does internally.
             mock_flow_instance.authorization_url(prompt="consent")
             seen["url"] = state.pending_auth_url["url"]
@@ -136,6 +156,12 @@ class TestCustomRedirectPortPath:
         seen = {}
 
         def stop_after_publish(*args, **kwargs):
+            """Capture the published URL, then abort the flow.
+
+            Raises:
+                OSError: Always, to unwind the flow instead of blocking on a
+                    real OAuth callback.
+            """
             # The URL is published before the callback server starts; capture it
             # there and abort rather than blocking on a real callback.
             seen["url"] = state.pending_auth_url["url"]
@@ -204,6 +230,7 @@ class TestWebAuthStatusExposesUrl:
     def test_status_reports_the_pending_url(
         self, mock_exists, mock_needs_setup, mock_settings
     ):
+        """/api/web-auth-status must surface whatever URL is currently pending."""
         _configure_settings(mock_settings)
         state.pending_auth_url["url"] = AUTH_URL
 
