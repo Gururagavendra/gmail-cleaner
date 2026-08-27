@@ -517,7 +517,26 @@ def get_gmail_service():
                             # request, and google-auth-oauthlib dereferences the
                             # unset `last_request_uri`. Translate that into the
                             # timeout it actually is.
-                            if "replace" not in str(e):
+                            #
+                            # The guard has to survive two library generations:
+                            #   <=1.3 raises a bare AttributeError, message
+                            #     "'NoneType' object has no attribute 'replace'".
+                            #   >=1.4 catches that itself and re-raises
+                            #     WSGITimeoutError - which SUBCLASSES AttributeError
+                            #     and carries the message "Timed out waiting for
+                            #     response from authorization server", with no
+                            #     "replace" in it.
+                            # So the exact-type check is deliberate: only a bare
+                            # AttributeError has to match the message, while any
+                            # subclass (i.e. WSGITimeoutError) is already the
+                            # timeout we are looking for. Do NOT "simplify" this
+                            # to isinstance() - that reverts the <=1.3 narrowing.
+                            #
+                            # Matching on e.name == "replace" instead looks tidier
+                            # but is a trap: AttributeError only carries .name when
+                            # raised by real attribute access, so hand-constructed
+                            # errors (as in the tests) have .name == None.
+                            if type(e) is AttributeError and "replace" not in str(e):
                                 raise
                             raise TimeoutError(
                                 f"OAuth authorization timed out after {OAUTH_TIMEOUT_SECONDS} seconds. "

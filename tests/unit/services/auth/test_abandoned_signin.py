@@ -19,13 +19,16 @@ class _InlineThread:
     """
 
     def __init__(self, target=None, daemon=None, **kwargs):
+        """Record the callable, ignoring the threading-specific arguments."""
         self._target = target
 
     def start(self):
+        """Run the target on the calling thread instead of a new one."""
         self._target()
 
 
 def _configure_settings(mock_settings):
+    """Give the patched settings mock the attributes the OAuth path reads."""
     mock_settings.credentials_file = "credentials.json"
     mock_settings.token_file = "token.json"
     mock_settings.scopes = ["scope1"]
@@ -35,6 +38,10 @@ def _configure_settings(mock_settings):
 
 
 def _only_credentials_exist(path):
+    """Fake os.path.exists: credentials are present, no token yet.
+
+    This is the state that forces a full interactive sign-in.
+    """
     if "token.json" in str(path):
         return False
     if "credentials.json" in str(path):
@@ -129,4 +136,42 @@ class TestAbandonedSignInReleasesLock:
         auth.get_gmail_service()
 
         assert "OAuth timeout" not in caplog.text
+        assert auth._auth_in_progress["active"] is False
+
+    @patch("app.services.auth.settings")
+    @patch("os.path.exists")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data='{"installed": {"client_id": "test"}}',
+    )
+    @patch("app.services.auth.InstalledAppFlow")
+    @patch("app.services.auth.threading.Thread", _InlineThread)
+    @patch("app.services.auth._auth_in_progress", {"active": False})
+    @patch("app.services.auth.is_web_auth_mode", return_value=False)
+    def test_wsgi_timeout_error_subclass_is_also_a_timeout(
+        self, mock_web_auth, mock_flow, mock_file, mock_exists, mock_settings, caplog
+    ):
+        """google-auth-oauthlib >=1.4 reports the timeout as its own subclass.
+
+        It wraps the unset `last_request_uri` itself and raises
+        WSGITimeoutError, which subclasses AttributeError but carries a
+        message with no "replace" in it. Matching the message alone would
+        miss it, so the guard must accept AttributeError subclasses.
+        """
+        _configure_settings(mock_settings)
+        mock_exists.side_effect = _only_credentials_exist
+
+        class WSGITimeoutError(AttributeError):
+            """Mirror of the exception google-auth-oauthlib >=1.4 raises."""
+
+        mock_flow_instance = Mock()
+        mock_flow.from_client_secrets_file.return_value = mock_flow_instance
+        mock_flow_instance.run_local_server.side_effect = WSGITimeoutError(
+            "Timed out waiting for response from authorization server"
+        )
+
+        auth.get_gmail_service()
+
+        assert "OAuth timeout" in caplog.text
         assert auth._auth_in_progress["active"] is False
