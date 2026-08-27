@@ -58,7 +58,9 @@ class Settings(BaseSettings):
                 f"Invalid OAUTH_REDIRECT_URI: {v!r}. "
                 "Must be an absolute URL starting with http:// or https://."
             )
-        if not parsed.netloc:
+        # Check hostname, not netloc: "https://:443/" and "https://user@/" both
+        # have a non-empty netloc but no host at all, and Google rejects them.
+        if not parsed.hostname:
             raise ValueError(
                 f"Invalid OAUTH_REDIRECT_URI: {v!r}. Must include a host, "
                 "e.g. https://gmail.example.com/."

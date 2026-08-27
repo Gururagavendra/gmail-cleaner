@@ -278,7 +278,7 @@ If you're accessing via a **custom domain** (e.g., `gmail.example.com`) instead 
 - ✅ `http://localhost:8767/` (for local access)
 - ✅ `http://gmail.example.com:8767/` (custom domain)
 - ✅ `http://mygmail.duckdns.org:8767/` (dynamic DNS)
-- ✅ `https://gmail.example.com/` (HTTPS reverse proxy — requires [`OAUTH_REDIRECT_URI`](#3-for-https-with-reverse-proxy))
+- ✅ `https://gmail.example.com/` (HTTPS reverse proxy — requires [`OAUTH_REDIRECT_URI`](#oauth-error-redirect-uri-mismatch-behind-an-https-reverse-proxy))
 - ❌ `http://192.168.1.100:8767/` (IP addresses not allowed)
 - ❌ `http://10.0.0.5:8767/` (private IPs not allowed)
 

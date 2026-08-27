@@ -54,6 +54,8 @@ class TestOAuthRedirectUri:
             "gmail.example.com:8767/",  # host:port parsed as scheme
             "ftp://gmail.example.com/",  # wrong scheme
             "https://",  # no host
+            "https://:443/",  # port only - netloc is truthy, host is not
+            "https://user@/",  # userinfo only - netloc is truthy, host is not
         ],
     )
     def test_rejects_uris_google_would_refuse(self, value):
