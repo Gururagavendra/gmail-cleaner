@@ -133,6 +133,9 @@ cd gmail-cleaner
 
 ### Option A: Docker (Recommended)
 
+> **Prefer a one-click deploy?** [Easypanel](https://easypanel.io) is a self-hosted Docker deployment platform, and Gmail Cleaner has a one-click deployment template there: https://easypanel.io/templates/gmail-cleaner. You'll still need to bring your own `credentials.json` and follow the OAuth steps below via the app logs.
+
+
 1. Pull the latest image and start the container:
 ```bash
 docker compose pull && docker compose up
