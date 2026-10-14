@@ -1,0 +1,30 @@
+name: Build and Push Docker Image to GHCR
+
+# Fork-only workflow: publishes this fork's build to GHCR on a GitHub-hosted
+# runner. Must never be included in pull requests sent upstream.
+#
+# The image the cluster pulls, built where a public repository may: a hosted
+# runner, which is free for public repositories and carries no cluster identity.
+# The old path pushed to Harbor, an internal host reachable only from the
+# organisation's self-hosted runners — which no longer accept public repositories.
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+
+# Least privilege by default; the job grants what it needs.
+permissions:
+  contents: read
+
+jobs:
+  docker-build-push:
+    # Only here: a fork has neither the token nor the package.
+    if: github.repository == 'vchatela-org/gmail-cleaner'
+    permissions:
+      contents: read
+      packages: write
+    uses: vchatela-org/shared-workflows/.github/workflows/docker-build-push-ghcr.yml@acd8755fe85c59123b7c7eace5dc6be7d93d781d # v1.3.0
+    with:
+      image_name: gmail-cleaner
