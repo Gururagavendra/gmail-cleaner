@@ -5,6 +5,7 @@ Central configuration and settings for the application.
 """
 
 import os
+from urllib.parse import urlparse
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,6 +33,39 @@ class Settings(BaseSettings):
         default="localhost",
         description="Custom host for OAuth redirect (e.g., your domain or IP)",
     )
+    oauth_redirect_uri: str | None = Field(
+        default=None,
+        description=(
+            "Full OAuth redirect URI, e.g. https://gmail.example.com/. Set this when a "
+            "reverse proxy terminates TLS or serves the callback on a path/port that "
+            "cannot be expressed with oauth_host and oauth_external_port. "
+            "Takes precedence over both."
+        ),
+    )
+
+    @field_validator("oauth_redirect_uri", mode="before")
+    @classmethod
+    def validate_oauth_redirect_uri(cls, v) -> str | None:
+        """Reject redirect URIs Google would refuse, so it fails at startup not mid-flow."""
+        if v is None:
+            return None
+        if not isinstance(v, str) or not v.strip():
+            return None
+        v = v.strip()
+        parsed = urlparse(v)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(
+                f"Invalid OAUTH_REDIRECT_URI: {v!r}. "
+                "Must be an absolute URL starting with http:// or https://."
+            )
+        # Check hostname, not netloc: "https://:443/" and "https://user@/" both
+        # have a non-empty netloc but no host at all, and Google rejects them.
+        if not parsed.hostname:
+            raise ValueError(
+                f"Invalid OAUTH_REDIRECT_URI: {v!r}. Must include a host, "
+                "e.g. https://gmail.example.com/."
+            )
+        return v
 
     @field_validator("web_auth", mode="before")
     @classmethod

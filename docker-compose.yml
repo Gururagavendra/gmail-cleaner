@@ -34,4 +34,10 @@ services:
       # Uncomment and set OAUTH_EXTERNAL_PORT if using custom port mapping
       # (e.g., if you map ports like "18767:8767", set OAUTH_EXTERNAL_PORT=18767)
       # - OAUTH_EXTERNAL_PORT=18767
+
+      # Uncomment and set OAUTH_REDIRECT_URI if a reverse proxy terminates TLS.
+      # Used verbatim, so https and a portless URL both work, and it overrides the
+      # two settings above. Must match the Authorized redirect URI in Google Cloud
+      # character for character, and must be proxied to container port 8767.
+      # - OAUTH_REDIRECT_URI=https://gmail.example.com/
     restart: unless-stopped
