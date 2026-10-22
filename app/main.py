@@ -5,6 +5,7 @@ Main application factory and configuration.
 """
 
 import hashlib
+import os
 import subprocess
 import time
 from contextlib import asynccontextmanager
@@ -17,6 +18,32 @@ from app.core import settings
 from app.api import status_router, actions_router
 
 templates = Jinja2Templates(directory="templates")
+
+
+def get_asset_hash() -> str | None:
+    """Hash served frontend assets so Docker builds without git still bust caches."""
+    asset_paths = []
+    for directory in ("static", "templates"):
+        if not os.path.isdir(directory):
+            continue
+        for root, _dirs, files in os.walk(directory):
+            for file_name in files:
+                if file_name.endswith((".css", ".html", ".js")):
+                    asset_paths.append(os.path.join(root, file_name))
+
+    if not asset_paths:
+        return None
+
+    hasher = hashlib.sha256()
+    for file_path in sorted(asset_paths):
+        hasher.update(file_path.encode())
+        try:
+            with open(file_path, "rb") as f:
+                hasher.update(f.read())
+        except OSError:
+            pass
+
+    return hasher.hexdigest()[:8]
 
 
 def get_cache_bust_value() -> str:
@@ -99,6 +126,11 @@ def get_cache_bust_value() -> str:
     # If we have a base value (commit hash), use it
     if base_value:
         return base_value
+
+    # Docker images may not contain .git, so use frontend asset content.
+    asset_hash = get_asset_hash()
+    if asset_hash:
+        return asset_hash
 
     # Fall back to app version
     if settings.app_version:

@@ -118,7 +118,7 @@ async def api_delete_emails(request: DeleteEmailsRequest):
             detail="Sender email is required",
         )
     try:
-        return delete_emails_by_sender(request.sender)
+        return delete_emails_by_sender(request.sender, request.mail_scope)
     except Exception as e:
         logger.exception("Error deleting emails")
         raise HTTPException(
@@ -132,7 +132,9 @@ async def api_delete_emails_bulk(
     request: DeleteBulkRequest, background_tasks: BackgroundTasks
 ):
     """Delete emails from multiple senders (background task with progress)."""
-    background_tasks.add_task(delete_emails_bulk_background, request.senders)
+    background_tasks.add_task(
+        delete_emails_bulk_background, request.senders, request.mail_scope
+    )
     return {"status": "started"}
 
 
