@@ -1,6 +1,9 @@
 name: PR Checks
 
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -18,7 +21,7 @@ permissions:
 
 jobs:
   require-labels:
-    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.number == github.event.pull_request.number && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.id == github.event.repository.id && github.event.pull_request.head.repo.id == github.event.repository.id && github.event.pull_request.base.repo.full_name == github.repository && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: [self-hosted, Linux, X64]
     container: node:24-bookworm-slim
     steps:
@@ -27,17 +30,28 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Trusted dispatch only. No PR source checkout or execution.
-            if (context.eventName !== 'workflow_dispatch' ||
+            // Owner PR events or supplemental trusted dispatch; never check out PR code.
+            const isPR = context.eventName === 'pull_request';
+            const eventPR = context.payload.pull_request;
+            if ((!isPR && context.eventName !== 'workflow_dispatch') ||
                 process.env.GITHUB_ACTOR_ID !== '45983094' ||
                 process.env.GITHUB_TRIGGERING_ACTOR !== 'daddyparodz' ||
                 context.actor !== 'daddyparodz' ||
                 context.repo.owner !== 'daddyparodz' || context.repo.repo !== 'gmail-cleaner' ||
                 context.payload.repository.full_name !== 'daddyparodz/gmail-cleaner' ||
-                context.payload.repository.owner.id !== 45983094 || context.ref !== 'refs/heads/main') {
+                context.payload.repository.owner.id !== 45983094 || (!isPR && context.ref !== 'refs/heads/main')) {
               throw new Error('Untrusted metadata dispatch');
             }
-            const inputs = context.payload.inputs || {};
+            const repo = context.payload.repository;
+            if (isPR && (!['opened', 'labeled', 'unlabeled'].includes(context.payload.action) ||
+                !Number.isSafeInteger(context.payload.number) || context.payload.number <= 0 ||
+                eventPR?.number !== context.payload.number || eventPR.state !== 'open' ||
+                eventPR.base?.repo?.id !== repo.id || eventPR.head?.repo?.id !== repo.id ||
+                eventPR.base.repo.full_name !== repo.full_name || eventPR.head.repo.full_name !== repo.full_name ||
+                eventPR.base.ref !== 'main' || !/^[0-9a-f]{40}$/.test(eventPR.base.sha || ''))) {
+              throw new Error('Untrusted PR event provenance');
+            }
+            const inputs = isPR ? {pr_number: String(context.payload.number), head_sha: eventPR.head.sha} : context.payload.inputs || {};
             if (!/^[1-9][0-9]*$/.test(inputs.pr_number || '') ||
                 !/^[0-9a-f]{40}$/.test(inputs.head_sha || '')) {
               throw new Error('Explicit PR number and immutable head SHA required');
@@ -50,7 +64,7 @@ jobs:
               if (candidate.number !== number || candidate.state !== 'open' ||
                   candidate.base?.repo?.id !== repo.id || candidate.head?.repo?.id !== repo.id ||
                   candidate.base.repo.full_name !== repo.full_name || candidate.head.repo.full_name !== repo.full_name ||
-                  candidate.base.ref !== 'main' || candidate.base.sha !== context.sha ||
+                  candidate.base.ref !== 'main' || candidate.base.sha !== (isPR ? eventPR.base.sha : context.sha) ||
                   candidate.head.sha !== inputs.head_sha) {
                 throw new Error('PR provenance changed or is not same-repository exact-head');
               }
@@ -76,7 +90,7 @@ jobs:
             }
 
   auto-assign:
-    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.number == github.event.pull_request.number && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.id == github.event.repository.id && github.event.pull_request.head.repo.id == github.event.repository.id && github.event.pull_request.base.repo.full_name == github.repository && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: [self-hosted, Linux, X64]
     container: node:24-bookworm-slim
     steps:
@@ -84,17 +98,28 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Trusted dispatch only. No PR source checkout or execution.
-            if (context.eventName !== 'workflow_dispatch' ||
+            // Owner PR events or supplemental trusted dispatch; never check out PR code.
+            const isPR = context.eventName === 'pull_request';
+            const eventPR = context.payload.pull_request;
+            if ((!isPR && context.eventName !== 'workflow_dispatch') ||
                 process.env.GITHUB_ACTOR_ID !== '45983094' ||
                 process.env.GITHUB_TRIGGERING_ACTOR !== 'daddyparodz' ||
                 context.actor !== 'daddyparodz' ||
                 context.repo.owner !== 'daddyparodz' || context.repo.repo !== 'gmail-cleaner' ||
                 context.payload.repository.full_name !== 'daddyparodz/gmail-cleaner' ||
-                context.payload.repository.owner.id !== 45983094 || context.ref !== 'refs/heads/main') {
+                context.payload.repository.owner.id !== 45983094 || (!isPR && context.ref !== 'refs/heads/main')) {
               throw new Error('Untrusted metadata dispatch');
             }
-            const inputs = context.payload.inputs || {};
+            const repo = context.payload.repository;
+            if (isPR && (!['opened', 'labeled', 'unlabeled'].includes(context.payload.action) ||
+                !Number.isSafeInteger(context.payload.number) || context.payload.number <= 0 ||
+                eventPR?.number !== context.payload.number || eventPR.state !== 'open' ||
+                eventPR.base?.repo?.id !== repo.id || eventPR.head?.repo?.id !== repo.id ||
+                eventPR.base.repo.full_name !== repo.full_name || eventPR.head.repo.full_name !== repo.full_name ||
+                eventPR.base.ref !== 'main' || !/^[0-9a-f]{40}$/.test(eventPR.base.sha || ''))) {
+              throw new Error('Untrusted PR event provenance');
+            }
+            const inputs = isPR ? {pr_number: String(context.payload.number), head_sha: eventPR.head.sha} : context.payload.inputs || {};
             if (!/^[1-9][0-9]*$/.test(inputs.pr_number || '') ||
                 !/^[0-9a-f]{40}$/.test(inputs.head_sha || '')) {
               throw new Error('Explicit PR number and immutable head SHA required');
@@ -107,7 +132,7 @@ jobs:
               if (candidate.number !== number || candidate.state !== 'open' ||
                   candidate.base?.repo?.id !== repo.id || candidate.head?.repo?.id !== repo.id ||
                   candidate.base.repo.full_name !== repo.full_name || candidate.head.repo.full_name !== repo.full_name ||
-                  candidate.base.ref !== 'main' || candidate.base.sha !== context.sha ||
+                  candidate.base.ref !== 'main' || candidate.base.sha !== (isPR ? eventPR.base.sha : context.sha) ||
                   candidate.head.sha !== inputs.head_sha) {
                 throw new Error('PR provenance changed or is not same-repository exact-head');
               }

@@ -17,7 +17,7 @@ async function run(index, mutate = () => {}, actor = '45983094', configure = () 
   try { await new AsyncFunction('github','context','core','process', scripts[index])(github,context,core,process); return {reads,writes,failures}; }
   catch (error) { return {reads,writes,failures,error}; }
 }
-test('metadata workflows have two executable inline checks and no checkout', () => { assert.equal(scripts.length, 2); assert.ok(!yaml.includes('actions/checkout')); assert.ok(!yaml.includes('pull_request:')); });
+test('metadata workflows have two executable inline checks and no checkout', () => { assert.equal(scripts.length, 2); assert.ok(!yaml.includes('actions/checkout')); assert.ok(yaml.includes('pull_request:')); });
 for (const index of [0,1]) {
   test(`job ${index} validates fresh provenance before checks`, async () => { const r = await run(index); assert.ifError(r.error); assert.equal(r.reads, 2); assert.equal(r.writes, index); });
   test(`job ${index} rejects unauthorized actor before HTTP`, async () => { const r = await run(index, undefined, '9'); assert.ok(r.error); assert.equal(r.reads, 0); assert.equal(r.writes, 0); });
@@ -63,7 +63,7 @@ test('owner-only job event guards reject untrusted event paths', () => {
       const allows = github => new Function('github', 'startsWith', `return (${guard});`)(github, (s, p) => s.startsWith(p));
       const owner = {repository_owner_id: '45983094', actor_id: '45983094', triggering_actor: 'daddyparodz', event_name: 'workflow_dispatch', ref: 'refs/heads/main'};
       assert.equal(allows(owner), true);
-      for (const change of [{actor_id: '9'}, {repository_owner_id: '9'}, {triggering_actor: 'outsider'}, {event_name: 'pull_request'}, {event_name: 'pull_request_target'}, {event_name: 'workflow_run'}, {event_name: 'issue_comment'}, {ref: 'refs/tags/v1'}]) {
+      for (const change of [{actor_id: '9'}, {repository_owner_id: '9'}, {triggering_actor: 'outsider'}, {event_name: 'pull_request_target'}, {event_name: 'workflow_run'}, {event_name: 'issue_comment'}, {ref: 'refs/tags/v1'}]) {
         assert.equal(allows({...owner, ...change}), false, JSON.stringify(change));
       }
       assert.equal(allows({...owner, event_name: 'push'}), i === 0);
@@ -73,3 +73,47 @@ test('owner-only job event guards reject untrusted event paths', () => {
 });
 test('missing labels still fail', async () => { const r = await run(0, p => p.labels = []); assert.ifError(r.error); assert.equal(r.failures, 1); });
 test('existing creator assignment is preserved without write', async () => { const r = await run(1, p => p.assignees.push({login:'daddyparodz'})); assert.ifError(r.error); assert.equal(r.writes,0); });
+
+function ownerPR(c) {
+  c.eventName = 'pull_request'; c.payload.action = 'opened';
+  c.payload.number = 7; c.payload.pull_request = pr();
+  c.payload.inputs = undefined; c.ref = 'refs/pull/7/merge'; c.sha = 'e'.repeat(40);
+}
+for (const index of [0, 1]) {
+  for (const action of ['opened', 'labeled', 'unlabeled']) {
+    test(`job ${index} accepts owner PR ${action} without dispatch inputs`, async () => {
+      const r = await run(index, undefined, undefined, c => {ownerPR(c); c.payload.action = action;});
+      assert.ifError(r.error); assert.equal(r.reads, 2); assert.equal(r.writes, index);
+    });
+  }
+  for (const actor of ['9', '49699333']) {
+    test(`job ${index} rejects non-owner PR actor ${actor} before HTTP`, async () => {
+      const r = await run(index, undefined, actor, ownerPR);
+      assert.ok(r.error); assert.equal(r.reads, 0); assert.equal(r.writes, 0);
+    });
+  }
+  test(`job ${index} rejects PR head changed during fresh lookup`, async () => {
+    const r = await run(index, (p, n) => {if (n === 2) p.head.sha = 'f'.repeat(40);}, undefined, ownerPR);
+    assert.ok(r.error); assert.equal(r.writes, 0);
+  });
+  for (const [name, mutate] of Object.entries({fork: c => c.payload.pull_request.head.repo.id = 2, number: c => c.payload.number = 8, base: c => c.payload.pull_request.base.sha = 'f'.repeat(40), head: c => c.payload.pull_request.head.sha = 'f'.repeat(40), malformedHead: c => c.payload.pull_request.head.sha = 'main', wrongBase: c => c.payload.pull_request.base.ref = 'other', action: c => c.payload.action = 'closed'})) {
+    test(`job ${index} rejects owner PR ${name}`, async () => {
+      const r = await run(index, undefined, undefined, c => {ownerPR(c); mutate(c);});
+      assert.ok(r.error); assert.equal(r.writes, 0);
+    });
+  }
+}
+test('owner PR jobs execute and test checkout is attached to exact PR head', () => {
+  for (const source of [testsYaml, yaml]) {
+    for (const [,guard] of source.matchAll(/^    if: (.+)$/gm)) {
+      const github = {repository_owner_id:'45983094', actor_id:'45983094', triggering_actor:'daddyparodz', event_name:'pull_request', ref:'refs/pull/7/merge', repository:'daddyparodz/gmail-cleaner', event:{action:'opened', number:7, repository:{id:1}, pull_request:pr()}};
+      const allows = () => new Function('github','startsWith', `return (${guard});`)(github, (a,b) => a.startsWith(b));
+      assert.equal(allows(), true);
+      github.actor_id = '49699333'; assert.equal(allows(), false);
+      github.actor_id = '45983094'; github.event.pull_request.head.repo.id = 2; assert.equal(allows(), false);
+    }
+  }
+  assert.match(testsYaml, /ref: \$\{\{ github.event.pull_request.head.sha \|\| github.sha \}\}/);
+  assert.match(testsYaml, /types: \[opened, reopened, synchronize\]/);
+  assert.match(testsYaml, /persist-credentials: false/);
+});
