@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     app_name: str = "Gmail Cleaner"
     app_version: str = "1.0.0"
     debug: bool = False
+    host: str = Field(
+        default="127.0.0.1",
+        description="Network interface the web server binds to. Defaults to "
+        "loopback so the API is not reachable from the local network. Set to "
+        "0.0.0.0 to listen on all interfaces (required inside Docker).",
+    )
     port: int = 8766
     oauth_port: int = 8767
     oauth_external_port: int | None = Field(
@@ -27,6 +33,12 @@ class Settings(BaseSettings):
     web_auth: bool = Field(
         default=False,
         description="Enable web-based authentication mode",
+    )
+    api_token: str = Field(
+        default="",
+        description="Shared secret required to call the API. When the server "
+        "binds a non-loopback interface and this is left empty, a random token "
+        "is generated at startup so the API is never exposed without auth.",
     )
     oauth_host: str = Field(
         default="localhost",
@@ -43,6 +55,10 @@ class Settings(BaseSettings):
             normalized = v.lower().strip()
             return normalized in ("true", "1", "yes", "on")
         return bool(v)
+
+    def is_loopback_host(self) -> bool:
+        """Return True when the server only listens on the local machine."""
+        return self.host.strip().lower() in ("127.0.0.1", "::1", "localhost", "")
 
     credentials_file: str = "credentials.json"
     token_file: str = "token.json"

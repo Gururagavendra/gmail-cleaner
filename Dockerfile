@@ -8,6 +8,12 @@ ENV PYTHONUNBUFFERED=1
 # Enable web auth mode for Docker (binds OAuth to 0.0.0.0)
 ENV WEB_AUTH=true
 
+# Bind on all interfaces inside the container so the published port is
+# reachable. Because this is a non-loopback bind, the app requires an API
+# token: set API_TOKEN to pin one, otherwise a random token is generated at
+# startup and printed to the container logs.
+ENV HOST=0.0.0.0
+
 # Install uv for faster package management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 

@@ -9,12 +9,17 @@ import subprocess
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.core import settings
 from app.api import status_router, actions_router
+from app.api.auth import (
+    get_effective_token,
+    require_api_auth,
+    resolve_effective_token,
+)
 
 templates = Jinja2Templates(directory="templates")
 
@@ -125,6 +130,10 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """Application factory - creates and configures the FastAPI app."""
 
+    # Decide whether the API must require a token (non-loopback bind) and, if
+    # so, which token enforces it. Done before routers are mounted.
+    resolve_effective_token()
+
     app = FastAPI(
         title=settings.app_name,
         description="Bulk unsubscribe and email management tool for Gmail",
@@ -137,19 +146,34 @@ def create_app() -> FastAPI:
     # Mount static files
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-    # Include API routers
-    app.include_router(status_router)
-    app.include_router(actions_router)
+    # Include API routers — every /api endpoint is guarded by the token check.
+    # When the server is loopback-only the dependency is a no-op, preserving the
+    # local single-user experience.
+    app.include_router(status_router, dependencies=[Depends(require_api_auth)])
+    app.include_router(actions_router, dependencies=[Depends(require_api_auth)])
 
     # HTML routes
     @app.get("/", include_in_schema=False)
     async def root(request: Request):
         """Serve the main HTML page."""
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request,
             "index.html",
             {"cache_bust": STARTUP_CACHE_BUST, "version": settings.app_version},
         )
+        # Hand the same-origin browser its API token via a cookie so the UI
+        # keeps working without any client-side changes. Sent only when auth is
+        # actually in effect.
+        token = get_effective_token()
+        if token:
+            response.set_cookie(
+                "api_token",
+                token,
+                httponly=True,
+                samesite="strict",
+                secure=request.url.scheme == "https",
+            )
+        return response
 
     return app
 

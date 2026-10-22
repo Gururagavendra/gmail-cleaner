@@ -18,6 +18,7 @@ import uvicorn
 
 from app.core import settings
 from app.main import app
+from app.api.auth import get_effective_token, token_was_generated
 
 
 def main():
@@ -44,6 +45,22 @@ def main():
     print(f"\n{settings.credentials_file} found!")
 
     port = int(os.environ.get("PORT", settings.port))
+    host = settings.host
+
+    # Report the API authentication posture so the operator is never surprised.
+    token = get_effective_token()
+    if token:
+        if token_was_generated():
+            print("\nAPI authentication: ENABLED (auto-generated token)")
+            print(f"   API token: {token}")
+            print("   The web UI authenticates automatically in the browser.")
+            print("   Use this token for direct API/CLI calls:")
+            print('   Authorization: Bearer <token>   (or cookie api_token=<token>)')
+            print("   Set API_TOKEN in the environment to pin a stable token.")
+        else:
+            print("\nAPI authentication: ENABLED (API_TOKEN from environment)")
+    else:
+        print(f"\nAPI authentication: disabled (loopback-only bind on {host})")
 
     print(f"\nOpening browser at: http://localhost:{port}")
     print("   (Keep this terminal open)")
@@ -55,8 +72,9 @@ def main():
             1.0, lambda: webbrowser.open(f"http://localhost:{port}")
         ).start()
 
-    # Start FastAPI with Uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    # Start FastAPI with Uvicorn. Host defaults to loopback (see Settings.host);
+    # set HOST=0.0.0.0 to listen on all interfaces (required inside Docker).
+    uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":
