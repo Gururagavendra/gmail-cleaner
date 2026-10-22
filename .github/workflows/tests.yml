@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Bootstrap container
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libsqlite3-0
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}

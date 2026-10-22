@@ -50,6 +50,28 @@ for (const index of [0, 1]) {
   });
 }
 const testsYaml = fs.readFileSync(path.join(__dirname, '../.github/workflows/tests.yml'), 'utf8');
+test('tests bootstrap declares the SQLite runtime before Python setup', () => {
+  const os = require('node:os');
+  const {spawnSync} = require('node:child_process');
+  const bootstrap = testsYaml.match(/- name: Bootstrap container\r?\n\s+run: (.+)/)?.[1];
+  assert.ok(bootstrap, 'actual tests bootstrap must exist');
+  assert.ok(testsYaml.indexOf(bootstrap) < testsYaml.indexOf('uses: actions/setup-python@'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-bootstrap-'));
+  try {
+    fs.writeFileSync(path.join(directory, 'apt-get'), '#!/bin/bash\nprintf "%s\\n" "$*"\n', {mode: 0o755});
+    const result = spawnSync('bash', ['-c', bootstrap], {
+      encoding: 'utf8', env: {...process.env, PATH: `${directory}${path.delimiter}${process.env.PATH}`},
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const commands = result.stdout.trim().split(/\r?\n/);
+    assert.equal(commands[0], 'update');
+    assert.match(commands[1], /^install -y --no-install-recommends /);
+    assert.ok(commands[1].split(/\s+/).includes('libsqlite3-0'), 'bootstrap must install libsqlite3-0');
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+});
 test('CI executes metadata regression suite', () => {
   assert.match(testsYaml, /run: node --test tests\/ci-metadata\.test\.cjs/);
   assert.match(testsYaml, /actions\/setup-node@/);
