@@ -13,8 +13,6 @@ permissions:
 
 jobs:
   test:
-    outputs:
-      coverage_name: ${{ format('coverage-{0}-{1}-{2}', github.run_id, github.run_attempt, github.event.pull_request.head.sha || github.sha) }}
     if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.number == github.event.pull_request.number && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.id == github.event.repository.id && github.event.pull_request.head.repo.id == github.event.repository.id && github.event.pull_request.base.repo.full_name == github.repository && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: [self-hosted, Linux, X64]
     container: ubuntu:24.04
@@ -24,7 +22,7 @@ jobs:
 
     steps:
       - name: Bootstrap container
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git gpg libsqlite3-0
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libsqlite3-0
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -77,40 +75,3 @@ jobs:
           path: coverage.xml
           if-no-files-found: error
           retention-days: 1
-
-  coverage:
-    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.number == github.event.pull_request.number && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.id == github.event.repository.id && github.event.pull_request.head.repo.id == github.event.repository.id && github.event.pull_request.base.repo.full_name == github.repository && github.event.pull_request.head.repo.full_name == github.repository))
-    needs: test
-    permissions:
-      contents: read
-      id-token: write
-    runs-on: [self-hosted, Linux, X64]
-    container: ubuntu:24.04
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Bootstrap coverage upload
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git gpg
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-          sparse-checkout: .github/CODEOWNERS
-          sparse-checkout-cone-mode: false
-      - name: Retrieve tested coverage report
-        uses: actions/download-artifact@v4
-        if: ${{ env.ACT != 'true' }}
-        with:
-          name: ${{ needs.test.outputs.coverage_name }}
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
-        if: ${{ env.ACT != 'true' }}
-        with:
-          files: ./coverage.xml
-          use_oidc: true
-          override_commit: ${{ github.event.pull_request.head.sha || github.sha }}
-          disable_search: true
-          disable_file_fixes: true
-          plugins: noop
-          fail_ci_if_error: true
