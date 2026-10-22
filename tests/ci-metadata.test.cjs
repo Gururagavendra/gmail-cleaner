@@ -72,6 +72,43 @@ test('tests bootstrap declares the SQLite runtime before Python setup', () => {
     fs.rmSync(directory, {recursive: true, force: true});
   }
 });
+test('coverage bootstrap installs required Codecov commands before upload', () => {
+  // codecov/codecov-action v5 (0fb7174895f61a3b6b78fc075e0cd60383518dac)
+  // action.yml requires bash, git, curl and gpg with signature validation enabled.
+  const os = require('node:os');
+  const {spawnSync} = require('node:child_process');
+  const bootstrap = testsYaml.match(/- name: Bootstrap container\r?\n\s+run: (.+)/)?.[1];
+  assert.ok(bootstrap, 'actual tests bootstrap must exist');
+  assert.ok(testsYaml.indexOf(bootstrap) < testsYaml.indexOf('uses: codecov/codecov-action@'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-codecov-'));
+  try {
+    fs.writeFileSync(path.join(directory, 'apt-get'), '#!/bin/bash\nprintf "%s\\n" "$*"\n', {mode: 0o755});
+    const result = spawnSync('bash', ['-c', bootstrap], {
+      encoding: 'utf8', env: {...process.env, PATH: `${directory}${path.delimiter}${process.env.PATH}`},
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const commands = result.stdout.trim().split(/\r?\n/);
+    assert.equal(commands[0], 'update');
+    assert.match(commands[1], /^install -y --no-install-recommends /);
+    for (const command of ['git', 'curl', 'gpg']) {
+      assert.ok(commands[1].split(/\s+/).includes(command), `bootstrap must install ${command}`);
+    }
+    // bash is supplied by the base OS and was exercised above, not an extra package.
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+});
+test('coverage upload uses supported v5 files input without bypassing validation', () => {
+  const step = testsYaml.match(/      - name: Upload coverage to Codecov\r?\n([\s\S]*?)(?=\r?\n      - |$)/)?.[1];
+  assert.ok(step, 'actual coverage upload step must exist');
+  assert.match(step, /uses: codecov\/codecov-action@v5\s/);
+  const inputs = Object.fromEntries([...step.matchAll(/^          ([\w-]+): (.+)$/gm)].map(m => [m[1], m[2].trim()]));
+  assert.equal(inputs.files, './coverage.xml', 'v5 requires files, not unsupported file');
+  assert.deepEqual(inputs, {files: './coverage.xml', fail_ci_if_error: 'false'});
+  assert.match(step, /if: \$\{\{ env.ACT != 'true' \}\}/);
+  assert.doesNotMatch(step, /continue-on-error/);
+});
 test('CI executes metadata regression suite', () => {
   assert.match(testsYaml, /run: node --test tests\/ci-metadata\.test\.cjs/);
   assert.match(testsYaml, /actions\/setup-node@/);

@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Bootstrap container
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libsqlite3-0
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git gpg libsqlite3-0
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -71,5 +71,5 @@ jobs:
         uses: codecov/codecov-action@v5
         if: ${{ env.ACT != 'true' }}
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           fail_ci_if_error: false
