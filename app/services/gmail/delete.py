@@ -274,6 +274,34 @@ def delete_emails_by_sender(sender: str) -> dict:
         return {"success": False, "deleted": 0, "size_freed": 0, "message": str(e)}
 
 
+def delete_emails_by_ids(message_ids: list[str]) -> dict:
+    """Delete specific emails by their message IDs (move to trash)."""
+    if not message_ids:
+        return {"success": False, "deleted": 0, "message": "No message IDs specified"}
+
+    service, error = get_gmail_service()
+    if error:
+        return {"success": False, "deleted": 0, "message": error}
+
+    try:
+        batch_size = 1000
+        deleted = 0
+        for i in range(0, len(message_ids), batch_size):
+            batch = message_ids[i : i + batch_size]
+            service.users().messages().batchModify(
+                userId="me", body={"ids": batch, "addLabelIds": ["TRASH"]}
+            ).execute()
+            deleted += len(batch)
+
+        return {
+            "success": True,
+            "deleted": deleted,
+            "message": f"Moved {deleted} emails to trash",
+        }
+    except Exception as e:
+        return {"success": False, "deleted": 0, "message": str(e)}
+
+
 def delete_emails_bulk(senders: list[str]) -> dict:
     """Delete emails from multiple senders."""
     if not senders:

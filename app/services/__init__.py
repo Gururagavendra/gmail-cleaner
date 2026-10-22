@@ -27,6 +27,7 @@ from .gmail import (
     get_delete_scan_status,
     get_delete_scan_results,
     delete_emails_by_sender,
+    delete_emails_by_ids,
     delete_emails_bulk,
     delete_emails_bulk_background,
     get_delete_bulk_status,
@@ -47,4 +48,8 @@ from .gmail import (
     # Mark Important
     mark_important_background,
     get_important_status,
+    # Jobs
+    run_job,
+    cancel_job,
+    get_job_status,
 )

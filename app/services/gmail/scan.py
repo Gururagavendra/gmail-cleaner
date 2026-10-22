@@ -88,6 +88,7 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                 "email": "",
                 "first_date": None,
                 "last_date": None,
+                "message_ids": [],
             }
         )
         processed = 0
@@ -109,6 +110,7 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                 domain = (
                     sender_email.split("@")[-1] if "@" in sender_email else sender_email
                 )
+                msg_id = response.get("id", "")
 
                 # Extract date from headers
                 email_date = None
@@ -122,6 +124,8 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                 unsubscribe_data[domain]["type"] = unsub_type
                 unsubscribe_data[domain]["sender"] = sender_name
                 unsubscribe_data[domain]["email"] = sender_email
+                if msg_id:
+                    unsubscribe_data[domain]["message_ids"].append(msg_id)
                 if len(unsubscribe_data[domain]["subjects"]) < 3:
                     unsubscribe_data[domain]["subjects"].append(subject)
 
@@ -210,6 +214,7 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                     "email": v.get("email", ""),
                     "first_date": v.get("first_date"),
                     "last_date": v.get("last_date"),
+                    "message_ids": v.get("message_ids", []),
                 }
                 for k, v in unsubscribe_data.items()
             ],

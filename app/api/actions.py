@@ -14,6 +14,7 @@ from app.models import (
     DeleteScanRequest,
     UnsubscribeRequest,
     DeleteEmailsRequest,
+    DeleteByIdsRequest,
     DeleteBulkRequest,
     DownloadEmailsRequest,
     CreateLabelRequest,
@@ -21,6 +22,7 @@ from app.models import (
     RemoveLabelRequest,
     ArchiveRequest,
     MarkImportantRequest,
+    CreateJobRequest,
 )
 from app.services import (
     scan_emails,
@@ -30,6 +32,7 @@ from app.services import (
     mark_emails_as_read,
     scan_senders_for_delete,
     delete_emails_by_sender,
+    delete_emails_by_ids,
     delete_emails_bulk_background,
     download_emails_background,
     create_label,
@@ -38,7 +41,10 @@ from app.services import (
     remove_label_from_senders_background,
     archive_emails_background,
     mark_important_background,
+    run_job,
+    cancel_job,
 )
+from app.core import state
 
 router = APIRouter(prefix="/api", tags=["Actions"])
 logger = logging.getLogger(__name__)
@@ -121,6 +127,24 @@ async def api_delete_emails(request: DeleteEmailsRequest):
         return delete_emails_by_sender(request.sender)
     except Exception as e:
         logger.exception("Error deleting emails")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete emails",
+        ) from e
+
+
+@router.post("/delete-by-ids")
+async def api_delete_by_ids(request: DeleteByIdsRequest):
+    """Delete specific emails by message ID."""
+    if not request.message_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="message_ids is required",
+        )
+    try:
+        return delete_emails_by_ids(request.message_ids)
+    except Exception as e:
+        logger.exception("Error deleting emails by ID")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete emails",
@@ -248,3 +272,48 @@ async def api_mark_important(
         partial(mark_important_background, request.senders, important=request.important)
     )
     return {"status": "started"}
+
+
+@router.post("/job/start")
+async def api_job_start(request: CreateJobRequest, background_tasks: BackgroundTasks):
+    """Start a long-running bulk email job over all matching emails."""
+    if state.job_status.get("running"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A job is already running. Cancel it before starting a new one.",
+        )
+    if request.action == "label" and not request.label_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="label_id is required when action is 'label'.",
+        )
+    # Claim the slot synchronously so concurrent requests see running=True
+    # before the background task starts.
+    state.job_status["running"] = True
+    state.job_status["cancelled"] = False
+    state.job_status["done"] = False
+    state.job_status["error"] = None
+    state.job_status["message"] = "Queued..."
+    filters = request.filters.model_dump() if request.filters else None
+    background_tasks.add_task(
+        run_job,
+        action=request.action,
+        filters=filters,
+        label_id=request.label_id,
+        important=request.important,
+        mailbox=request.mailbox,
+    )
+    return {"status": "started"}
+
+
+@router.post("/job/cancel")
+async def api_job_cancel():
+    """Cancel the currently running job."""
+    try:
+        return cancel_job()
+    except Exception as e:
+        logger.exception("Error cancelling job")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel job",
+        ) from e

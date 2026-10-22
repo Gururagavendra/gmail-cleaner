@@ -70,6 +70,12 @@
                         </svg>
                         <span>Mark as Read</span>
                     </a>
+                    <a href="#" class="nav-item" data-view="job">
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                        </svg>
+                        <span>Create Job</span>
+                    </a>
                 </nav>
 
                 <div class="sidebar-footer">
@@ -205,6 +211,7 @@
                                         <option value="500" selected>500</option>
                                         <option value="1000">1000</option>
                                         <option value="2000">2000</option>
+                                        <option value="5000">5000</option>
                                     </select>
                                 </div>
                                 <button class="btn btn-primary" id="scanBtn" onclick="startScan()">
@@ -240,6 +247,9 @@
                             <div class="toolbar-right">
                                 <button class="btn btn-primary" onclick="unsubscribeSelected()">
                                     Unsubscribe Selected
+                                </button>
+                                <button class="btn btn-danger" onclick="deleteSelectedSubscriptions()">
+                                    Delete Selected
                                 </button>
                             </div>
                         </div>
@@ -454,6 +464,119 @@
                     </div>
                 </div>
 
+                <!-- Create Job View -->
+                <div class="view hidden" id="jobView">
+                    <div class="content-header">
+                        <h1>Create Job</h1>
+                        <p>Run a bulk operation over all matching emails — respects Gmail API limits</p>
+                    </div>
+
+                    <div class="card" style="border-left: 4px solid var(--warning-color, #f59e0b);">
+                        <div class="card-body">
+                            <p style="margin:0; color: var(--text-secondary);">
+                                <strong>Warning:</strong> Jobs iterate over every email matching your filters
+                                and may take a very long time to complete. You can cancel at any point —
+                                emails already processed will not be reversed.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card" id="jobFormCard">
+                        <div class="card-header">
+                            <h3>Job Configuration</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="jobAction">Action</label>
+                                <select id="jobAction" class="form-select" onchange="GmailCleaner.Jobs.onActionChange()">
+                                    <option value="search">Search (count matching emails)</option>
+                                    <option value="find_subscriptions">Find Subscriptions (unlimited scan)</option>
+                                    <option value="delete">Delete (move to trash)</option>
+                                    <option value="archive">Archive (remove from inbox)</option>
+                                    <option value="label">Apply Label</option>
+                                    <option value="mark_important">Mark as Important</option>
+                                </select>
+                            </div>
+
+                            <!-- Mailbox/folder selector -->
+                            <div class="form-group">
+                                <label for="jobMailbox">Mailbox / Folder</label>
+                                <select id="jobMailbox" class="form-select">
+                                    <option value="">All Mail</option>
+                                    <option value="INBOX">Inbox</option>
+                                    <option value="SENT">Sent</option>
+                                    <option value="DRAFT">Drafts</option>
+                                    <option value="STARRED">Starred</option>
+                                    <option value="IMPORTANT">Important</option>
+                                    <option value="SPAM">Spam</option>
+                                    <option value="TRASH">Trash</option>
+                                    <option value="UNREAD">Unread</option>
+                                </select>
+                            </div>
+
+                            <!-- Label picker (shown only for "label" action) -->
+                            <div class="form-group hidden" id="jobLabelGroup">
+                                <label for="jobLabelSelect">Label to apply</label>
+                                <select id="jobLabelSelect" class="form-select">
+                                    <option value="">Loading labels...</option>
+                                </select>
+                            </div>
+
+                            <!-- Important toggle (shown only for "mark_important" action) -->
+                            <div class="form-group hidden" id="jobImportantGroup">
+                                <label for="jobImportant">Mark as</label>
+                                <select id="jobImportant" class="form-select">
+                                    <option value="true">Important</option>
+                                    <option value="false">Not Important</option>
+                                </select>
+                            </div>
+
+                            <p style="margin: 1rem 0 0; color: var(--text-secondary); font-size: 0.875rem;">
+                                Filters are taken from the filter bar above.
+                            </p>
+                            <p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+                                ⏱ Jobs are intentionally throttled (~1 second per batch of 100 emails) to stay within Gmail API rate limits. Large mailboxes may take several minutes. If a rate limit is hit anyway, the job will automatically back off and retry.
+                            </p>
+
+                            <div style="margin-top: 1rem; display: flex; gap: 0.75rem;">
+                                <button class="btn btn-primary" id="jobStartBtn" onclick="GmailCleaner.Jobs.startJob()">
+                                    <svg viewBox="0 0 24 24" width="18" height="18">
+                                        <path fill="currentColor" d="M8 5v14l11-7z"/>
+                                    </svg>
+                                    Start Job
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress card (shown while running) -->
+                    <div class="card hidden" id="jobProgressCard">
+                        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
+                            <h3 id="jobProgressTitle">Job Running</h3>
+                            <button class="btn btn-danger" id="jobCancelBtn" onclick="GmailCleaner.Jobs.cancelJob()">
+                                Cancel
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="progress-container">
+                                <div class="progress-bar" id="jobProgressBar" style="width:0%"></div>
+                            </div>
+                            <p class="progress-text" id="jobProgressText">Starting...</p>
+
+                            <div style="display:flex; gap:2rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                                <div style="text-align:center;">
+                                    <div style="font-size:1.75rem; font-weight:700; color:var(--primary-color);" id="jobBatchCount">0</div>
+                                    <div style="font-size:0.8rem; color:var(--text-secondary);">Batches processed</div>
+                                </div>
+                                <div style="text-align:center;">
+                                    <div style="font-size:1.75rem; font-weight:700; color:var(--primary-color);" id="jobEmailCount">0</div>
+                                    <div style="font-size:0.8rem; color:var(--text-secondary);">Emails affected</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 </div>
             </main>
         </div>
@@ -468,6 +591,7 @@
     <script src="/static/js/markread.js?v={{ cache_bust }}"></script>
     <script src="/static/js/delete.js?v={{ cache_bust }}"></script>
     <script src="/static/js/labels.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/jobs.js?v={{ cache_bust }}"></script>
     <!-- Litepicker Date Range Picker Library -->
     <script src="https://cdn.jsdelivr.net/npm/litepicker@latest/dist/litepicker.js"></script>
 </body>

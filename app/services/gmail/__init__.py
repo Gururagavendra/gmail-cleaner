@@ -42,6 +42,7 @@ from app.services.gmail.delete import (
     get_delete_scan_status,
     get_delete_scan_results,
     delete_emails_by_sender,
+    delete_emails_by_ids,
     delete_emails_bulk,
     delete_emails_bulk_background,
     get_delete_bulk_status,
@@ -67,6 +68,11 @@ from app.services.gmail.important import (
     mark_important_background,
     get_important_status,
 )
+from app.services.gmail.jobs import (
+    run_job,
+    cancel_job,
+    get_job_status,
+)
 
 # Export private helper functions with underscore-prefixed aliases for backward compatibility.
 # These are used by tests that import the original function names from this module.
@@ -84,6 +90,7 @@ __all__ = [
     # Delete
     "delete_emails_bulk",
     "delete_emails_bulk_background",
+    "delete_emails_by_ids",
     "delete_emails_by_sender",
     "get_delete_bulk_status",
     "get_delete_scan_results",
@@ -99,6 +106,10 @@ __all__ = [
     # Important
     "get_important_status",
     "mark_important_background",
+    # Jobs
+    "run_job",
+    "cancel_job",
+    "get_job_status",
     # Labels
     "apply_label_to_senders_background",
     "create_label",
