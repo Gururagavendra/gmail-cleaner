@@ -1,8 +1,16 @@
 name: PR Checks
 
 on:
-  pull_request:
-    types: [opened, labeled, unlabeled]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Same-repository pull request number
+        type: string
+        required: true
+      head_sha:
+        description: Expected immutable PR head commit (40 lowercase hex characters)
+        type: string
+        required: true
 
 permissions:
   pull-requests: write
@@ -10,14 +18,46 @@ permissions:
 
 jobs:
   require-labels:
-    runs-on: ubuntu-latest
+    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    container: node:24-bookworm-slim
     steps:
       - name: Check for labels
         id: check-labels
         uses: actions/github-script@v7
         with:
           script: |
-            const pr = context.payload.pull_request;
+            // Trusted dispatch only. No PR source checkout or execution.
+            if (context.eventName !== 'workflow_dispatch' ||
+                process.env.GITHUB_ACTOR_ID !== '45983094' ||
+                process.env.GITHUB_TRIGGERING_ACTOR !== 'daddyparodz' ||
+                context.actor !== 'daddyparodz' ||
+                context.repo.owner !== 'daddyparodz' || context.repo.repo !== 'gmail-cleaner' ||
+                context.payload.repository.full_name !== 'daddyparodz/gmail-cleaner' ||
+                context.payload.repository.owner.id !== 45983094 || context.ref !== 'refs/heads/main') {
+              throw new Error('Untrusted metadata dispatch');
+            }
+            const inputs = context.payload.inputs || {};
+            if (!/^[1-9][0-9]*$/.test(inputs.pr_number || '') ||
+                !/^[0-9a-f]{40}$/.test(inputs.head_sha || '')) {
+              throw new Error('Explicit PR number and immutable head SHA required');
+            }
+            const number = Number(inputs.pr_number);
+            if (!Number.isSafeInteger(number)) throw new Error('Invalid PR number');
+            async function resolve() {
+              const {data: candidate} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              const repo = context.payload.repository;
+              if (candidate.number !== number || candidate.state !== 'open' ||
+                  candidate.base?.repo?.id !== repo.id || candidate.head?.repo?.id !== repo.id ||
+                  candidate.base.repo.full_name !== repo.full_name || candidate.head.repo.full_name !== repo.full_name ||
+                  candidate.base.ref !== 'main' || candidate.base.sha !== context.sha ||
+                  candidate.head.sha !== inputs.head_sha) {
+                throw new Error('PR provenance changed or is not same-repository exact-head');
+              }
+              return candidate;
+            }
+            await resolve();
+            const pr = await resolve();
             const labels = pr.labels || [];
 
             if (labels.length === 0) {
@@ -36,13 +76,45 @@ jobs:
             }
 
   auto-assign:
-    runs-on: ubuntu-latest
+    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    container: node:24-bookworm-slim
     steps:
       - name: Auto-assign PR creator
         uses: actions/github-script@v7
         with:
           script: |
-            const pr = context.payload.pull_request;
+            // Trusted dispatch only. No PR source checkout or execution.
+            if (context.eventName !== 'workflow_dispatch' ||
+                process.env.GITHUB_ACTOR_ID !== '45983094' ||
+                process.env.GITHUB_TRIGGERING_ACTOR !== 'daddyparodz' ||
+                context.actor !== 'daddyparodz' ||
+                context.repo.owner !== 'daddyparodz' || context.repo.repo !== 'gmail-cleaner' ||
+                context.payload.repository.full_name !== 'daddyparodz/gmail-cleaner' ||
+                context.payload.repository.owner.id !== 45983094 || context.ref !== 'refs/heads/main') {
+              throw new Error('Untrusted metadata dispatch');
+            }
+            const inputs = context.payload.inputs || {};
+            if (!/^[1-9][0-9]*$/.test(inputs.pr_number || '') ||
+                !/^[0-9a-f]{40}$/.test(inputs.head_sha || '')) {
+              throw new Error('Explicit PR number and immutable head SHA required');
+            }
+            const number = Number(inputs.pr_number);
+            if (!Number.isSafeInteger(number)) throw new Error('Invalid PR number');
+            async function resolve() {
+              const {data: candidate} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              const repo = context.payload.repository;
+              if (candidate.number !== number || candidate.state !== 'open' ||
+                  candidate.base?.repo?.id !== repo.id || candidate.head?.repo?.id !== repo.id ||
+                  candidate.base.repo.full_name !== repo.full_name || candidate.head.repo.full_name !== repo.full_name ||
+                  candidate.base.ref !== 'main' || candidate.base.sha !== context.sha ||
+                  candidate.head.sha !== inputs.head_sha) {
+                throw new Error('PR provenance changed or is not same-repository exact-head');
+              }
+              return candidate;
+            }
+            await resolve();
+            const pr = await resolve();
             const creator = pr.user.login;
 
             // Get current assignees from webhook payload

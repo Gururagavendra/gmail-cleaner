@@ -2,16 +2,37 @@ name: Tests
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')
+    runs-on: [self-hosted, Linux, X64]
+    container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
 
     steps:
+      - name: Bootstrap container
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Test trusted metadata guards
+        run: node --test tests/ci-metadata.test.cjs
 
       - name: Set up Python
         uses: actions/setup-python@v5
