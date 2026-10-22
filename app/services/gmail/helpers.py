@@ -11,6 +11,37 @@ from urllib.parse import urlparse
 from typing import Optional, Union, Any
 
 
+def sanitize_gmail_query_value(value: str) -> str:
+    """Sanitize a value for safe use in Gmail search queries.
+
+    Gmail query syntax uses special operators (OR, AND, -, (), etc.) that could
+    be injected via unsanitized user input. This function quotes the value to
+    ensure it's treated as a literal string.
+
+    Args:
+        value: The raw value to sanitize (e.g., email address, domain)
+
+    Returns:
+        A quoted string safe for use in Gmail queries
+
+    Examples:
+        >>> sanitize_gmail_query_value("user@example.com")
+        '"user@example.com"'
+        >>> sanitize_gmail_query_value('evil@test.com OR from:admin@company.com')
+        '"evil@test.com OR from:admin@company.com"'
+        >>> sanitize_gmail_query_value('user"with"quotes@test.com')
+        '"user\\"with\\"quotes@test.com"'
+    """
+    if not value:
+        return ""
+
+    # Escape any existing backslashes first, then escape quotes
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+
+    # Wrap in quotes to treat as literal
+    return f'"{escaped}"'
+
+
 def validate_unsafe_url(url: str) -> str:
     """
     Validate URL to prevent SSRF.
@@ -132,10 +163,10 @@ def build_gmail_query(filters: Optional[Union[dict, Any]] = None) -> str:
         query_parts.append(f"category:{category}")
 
     if sender := filters.get("sender", ""):
-        query_parts.append(f"from:{sender}")
+        query_parts.append(f"from:{sanitize_gmail_query_value(sender)}")
 
     if label := filters.get("label", ""):
-        query_parts.append(f"label:{label}")
+        query_parts.append(f"label:{sanitize_gmail_query_value(label)}")
 
     return " ".join(query_parts)
 

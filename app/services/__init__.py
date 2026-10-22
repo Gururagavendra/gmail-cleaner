@@ -47,4 +47,13 @@ from .gmail import (
     # Mark Important
     mark_important_background,
     get_important_status,
+    # Unread
+    scan_unread_by_sender,
+    get_unread_scan_status,
+    get_unread_scan_results,
+    get_unread_action_status,
+    mark_read_by_senders_background,
+    mark_read_and_archive_by_senders_background,
+    archive_unread_by_senders_background,
+    delete_unread_by_senders_background,
 )

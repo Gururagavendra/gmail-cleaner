@@ -8,6 +8,7 @@ import time
 
 from app.core import state
 from app.services.auth import get_gmail_service
+from app.services.gmail.helpers import sanitize_gmail_query_value
 
 
 def mark_important_background(senders: list[str], *, important: bool = True) -> None:
@@ -16,30 +17,32 @@ def mark_important_background(senders: list[str], *, important: bool = True) -> 
 
     # Validate input
     if not senders or not isinstance(senders, list):
-        state.important_status["done"] = True
-        state.important_status["error"] = "No senders specified"
+        state.update_important_status(done=True, error="No senders specified")
         return
 
-    state.important_status["total_senders"] = len(senders)
     action = "Marking" if important else "Unmarking"
-    state.important_status["message"] = f"{action} as important..."
+    state.update_important_status(
+        total_senders=len(senders), message=f"{action} as important..."
+    )
 
     try:
         service, error = get_gmail_service()
         if error:
-            state.important_status["error"] = error
-            state.important_status["done"] = True
+            state.update_important_status(error=error, done=True)
             return
 
         total_affected = 0
 
         for i, sender in enumerate(senders):
-            state.important_status["current_sender"] = i + 1
-            state.important_status["message"] = f"{action} emails from {sender}..."
-            state.important_status["progress"] = int((i / len(senders)) * 100)
+            progress = int((i / len(senders)) * 100)
+            state.update_important_status(
+                current_sender=i + 1,
+                message=f"{action} emails from {sender}...",
+                progress=progress,
+            )
 
             # Find all emails from this sender
-            query = f"from:{sender}"
+            query = f"from:{sanitize_gmail_query_value(sender)}"
             message_ids = []
             page_token = None
 
@@ -77,16 +80,18 @@ def mark_important_background(senders: list[str], *, important: bool = True) -> 
                 if total_affected > 0 and total_affected % 500 == 0:
                     time.sleep(0.5)
 
-        state.important_status["progress"] = 100
-        state.important_status["done"] = True
-        state.important_status["affected_count"] = total_affected
         action_done = "marked as important" if important else "unmarked as important"
-        state.important_status["message"] = f"{total_affected} emails {action_done}"
+        state.update_important_status(
+            progress=100,
+            done=True,
+            affected_count=total_affected,
+            message=f"{total_affected} emails {action_done}",
+        )
 
     except Exception as e:
-        state.important_status["error"] = f"{e!s}"
-        state.important_status["done"] = True
-        state.important_status["message"] = f"Error: {e!s}"
+        state.update_important_status(
+            error=f"{e!s}", done=True, message=f"Error: {e!s}"
+        )
 
 
 def get_important_status() -> dict:

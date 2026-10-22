@@ -6,6 +6,7 @@ Functions for managing Gmail labels.
 
 from app.core import state
 from app.services.auth import get_gmail_service
+from app.services.gmail.helpers import sanitize_gmail_query_value
 
 
 def get_labels() -> dict:
@@ -134,25 +135,23 @@ def _apply_label_operation_background(
     state.reset_label_operation()
 
     if not label_id or not label_id.strip():
-        state.label_operation_status["done"] = True
-        state.label_operation_status["error"] = "Label ID is required"
+        state.update_label_operation_status(done=True, error="Label ID is required")
         return
 
     # Validate input
     if not senders or not isinstance(senders, list):
-        state.label_operation_status["done"] = True
-        state.label_operation_status["error"] = "No senders specified"
+        state.update_label_operation_status(done=True, error="No senders specified")
         return
 
     service, error = get_gmail_service()
     if error:
-        state.label_operation_status["done"] = True
-        state.label_operation_status["error"] = error
+        state.update_label_operation_status(done=True, error=error)
         return
 
     total_senders = len(senders)
-    state.label_operation_status["total_senders"] = total_senders
-    state.label_operation_status["message"] = finding_message
+    state.update_label_operation_status(
+        total_senders=total_senders, message=finding_message
+    )
 
     # Phase 1: Collect all message IDs
     all_message_ids = []
@@ -168,25 +167,30 @@ def _apply_label_operation_background(
             )
             label_name = label_info.get("name", "")
             if not label_name:
-                state.label_operation_status["done"] = True
-                state.label_operation_status["error"] = "Could not get label name"
+                state.update_label_operation_status(
+                    done=True, error="Could not get label name"
+                )
                 return
         except Exception as e:
-            state.label_operation_status["done"] = True
-            state.label_operation_status["error"] = f"Failed to fetch label: {str(e)}"
+            state.update_label_operation_status(
+                done=True, error=f"Failed to fetch label: {e!s}"
+            )
             return
 
     for i, sender in enumerate(senders):
-        state.label_operation_status["current_sender"] = i + 1
-        state.label_operation_status["progress"] = int((i / total_senders) * 40)
-        state.label_operation_status["message"] = f"Finding emails from {sender}..."
+        progress = int((i / total_senders) * 40)
+        state.update_label_operation_status(
+            current_sender=i + 1,
+            progress=progress,
+            message=f"Finding emails from {sender}...",
+        )
 
         try:
             # Build query: for remove, include label filter; for add, just sender
             if add_label:
-                query = f"from:{sender}"
+                query = f"from:{sanitize_gmail_query_value(sender)}"
             else:
-                query = f"from:{sender} label:{label_name}"
+                query = f"from:{sanitize_gmail_query_value(sender)} label:{label_name}"
 
             results = (
                 service.users()
@@ -212,18 +216,18 @@ def _apply_label_operation_background(
 
             all_message_ids.extend([msg["id"] for msg in messages])
         except Exception as e:
-            errors.append(f"{sender}: {str(e)}")
+            errors.append(f"{sender}: {e!s}")
 
     if not all_message_ids:
-        state.label_operation_status["progress"] = 100
-        state.label_operation_status["done"] = True
-        state.label_operation_status["message"] = no_emails_message
+        state.update_label_operation_status(
+            progress=100, done=True, message=no_emails_message
+        )
         return
 
     # Phase 2: Apply/remove label in batches
     total_emails = len(all_message_ids)
-    state.label_operation_status["message"] = applying_message.format(
-        count=total_emails
+    state.update_label_operation_status(
+        message=applying_message.format(count=total_emails)
     )
 
     batch_size = 1000
@@ -241,29 +245,30 @@ def _apply_label_operation_background(
             body = {**body_template, "ids": batch}
             service.users().messages().batchModify(userId="me", body=body).execute()
             affected += len(batch)
-            state.label_operation_status["affected_count"] = affected
-            state.label_operation_status["progress"] = 40 + int(
-                (affected / total_emails) * 60
-            )
-            state.label_operation_status["message"] = progress_message_template.format(
-                count=affected, total=total_emails
+            progress = 40 + int((affected / total_emails) * 60)
+            state.update_label_operation_status(
+                affected_count=affected,
+                progress=progress,
+                message=progress_message_template.format(count=affected, total=total_emails),
             )
     except Exception as e:
-        errors.append(f"Batch operation error: {str(e)}")
+        errors.append(f"Batch operation error: {e!s}")
 
     # Done
-    state.label_operation_status["progress"] = 100
-    state.label_operation_status["done"] = True
-    state.label_operation_status["affected_count"] = affected
-
     if errors:
-        state.label_operation_status["error"] = f"Some errors: {'; '.join(errors[:3])}"
-        state.label_operation_status["message"] = error_message_template.format(
-            count=affected
+        state.update_label_operation_status(
+            progress=100,
+            done=True,
+            affected_count=affected,
+            error=f"Some errors: {'; '.join(errors[:3])}",
+            message=error_message_template.format(count=affected),
         )
     else:
-        state.label_operation_status["message"] = success_message_template.format(
-            count=affected
+        state.update_label_operation_status(
+            progress=100,
+            done=True,
+            affected_count=affected,
+            message=success_message_template.format(count=affected),
         )
 
 

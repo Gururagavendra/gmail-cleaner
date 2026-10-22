@@ -42,21 +42,19 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
     # Validate input
     if count < 0:
         state.reset_mark_read()
-        state.mark_read_status["error"] = "Count must be 0 or greater"
-        state.mark_read_status["done"] = True
+        state.update_mark_read_status(error="Count must be 0 or greater", done=True)
         return
 
     state.reset_mark_read()
-    state.mark_read_status["message"] = "Connecting to Gmail..."
+    state.update_mark_read_status(message="Connecting to Gmail...")
 
     service, error = get_gmail_service()
     if error:
-        state.mark_read_status["error"] = error
-        state.mark_read_status["done"] = True
+        state.update_mark_read_status(error=error, done=True)
         return
 
     try:
-        state.mark_read_status["message"] = "Finding unread emails..."
+        state.update_mark_read_status(message="Finding unread emails...")
 
         # Build query
         query = "is:unread"
@@ -105,8 +103,9 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
                 ).execute()
 
                 marked += len(ids)
-                state.mark_read_status["message"] = f"Marked {marked} as read..."
-                state.mark_read_status["marked_count"] = marked
+                state.update_mark_read_status(
+                    message=f"Marked {marked} as read...", marked_count=marked
+                )
 
             # Stop if we've marked enough (when not marking all)
             if not mark_all and remaining <= 0:
@@ -118,17 +117,16 @@ def mark_emails_as_read(count: int = 100, filters: Optional[dict] = None):
                 break
 
         if marked == 0:
-            state.mark_read_status["message"] = "No unread emails found"
-            state.mark_read_status["progress"] = 100
+            state.update_mark_read_status(
+                message="No unread emails found", progress=100, done=True
+            )
         else:
-            state.mark_read_status["message"] = f"Done! Marked {marked} emails as read"
-            state.mark_read_status["progress"] = 100
-
-        state.mark_read_status["done"] = True
+            state.update_mark_read_status(
+                message=f"Done! Marked {marked} emails as read", progress=100, done=True
+            )
 
     except Exception as e:
-        state.mark_read_status["error"] = str(e)
-        state.mark_read_status["done"] = True
+        state.update_mark_read_status(error=str(e), done=True)
 
 
 def get_mark_read_status() -> dict:

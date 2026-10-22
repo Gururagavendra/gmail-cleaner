@@ -70,6 +70,12 @@
                         </svg>
                         <span>Mark as Read</span>
                     </a>
+                    <a href="#" class="nav-item" data-view="unread">
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="currentColor" d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                        </svg>
+                        <span>Unread Emails</span>
+                    </a>
                 </nav>
 
                 <div class="sidebar-footer">
@@ -327,6 +333,141 @@
                     </div>
                 </div>
 
+                <!-- Unread Emails View -->
+                <div class="view hidden" id="unreadView">
+                    <div class="content-header">
+                        <h1>Unread Emails by Sender</h1>
+                        <p>Scan unread emails and organize them by sender</p>
+                    </div>
+
+                    <!-- Info Note -->
+                    <div class="info-note">
+                        <svg viewBox="0 0 24 24" width="18" height="18">
+                            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                        <span><strong>Mark as Read</strong> removes unread status. <strong>Archive</strong> removes from inbox. <strong>Delete</strong> moves to trash.</span>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Scan & Actions</h3>
+                        </div>
+                        <div class="card-body">
+                            <!-- Row 1: Scan options -->
+                            <div class="action-row">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="unreadScanLimit">Emails to scan</label>
+                                    <select id="unreadScanLimit" class="form-select">
+                                        <option value="500">500</option>
+                                        <option value="1000" selected>1000</option>
+                                        <option value="2000">2000</option>
+                                        <option value="5000">5000</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Scope</label>
+                                    <div class="toggle-wrapper" style="display: flex; align-items: center; gap: 8px;">
+                                        <label class="toggle-switch" style="position: relative; display: inline-block; width: 40px; height: 20px;">
+                                            <input type="checkbox" id="unreadScopeToggle" onchange="toggleUnreadScope()" style="opacity: 0; width: 0; height: 0;">
+                                            <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 20px;"></span>
+                                        </label>
+                                        <span id="unreadScopeLabel">Inbox only</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" id="unreadScanBtn" onclick="startUnreadScan()">
+                                    <svg viewBox="0 0 24 24" width="18" height="18">
+                                        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                    </svg>
+                                    Scan Unread
+                                </button>
+                            </div>
+
+                            <!-- Row 2: Bulk action buttons -->
+                            <div class="action-row action-buttons-row">
+                                <div class="action-group">
+                                    <span class="action-group-label">Actions:</span>
+                                    <button class="btn btn-action" id="unreadMarkReadBtn" onclick="markReadSelected()" disabled>
+                                        <svg viewBox="0 0 24 24" width="16" height="16">
+                                            <path fill="currentColor" d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/>
+                                        </svg>
+                                        Mark as Read
+                                    </button>
+                                    <button class="btn btn-action" id="unreadMarkReadArchiveBtn" onclick="markReadAndArchiveSelected()" disabled>
+                                        <svg viewBox="0 0 24 24" width="16" height="16">
+                                            <path fill="currentColor" d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/>
+                                        </svg>
+                                        Mark Read + Archive
+                                    </button>
+                                    <button class="btn btn-action" id="unreadArchiveBtn" onclick="archiveUnreadSelected()" disabled>
+                                        <svg viewBox="0 0 24 24" width="16" height="16">
+                                            <path fill="currentColor" d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/>
+                                        </svg>
+                                        Archive Only
+                                    </button>
+                                    <button class="btn btn-action btn-danger" id="unreadDeleteBtn" onclick="deleteUnreadSelected()" disabled>
+                                        <svg viewBox="0 0 24 24" width="16" height="16">
+                                            <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                        </svg>
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Unread Progress Card -->
+                    <div class="card hidden" id="unreadProgressCard">
+                        <div class="card-body">
+                            <div class="progress-container">
+                                <div class="progress-bar" id="unreadProgressBar"></div>
+                            </div>
+                            <p class="progress-text" id="unreadProgressText">Starting...</p>
+                        </div>
+                    </div>
+
+                    <!-- Unread Results Section -->
+                    <div class="hidden" id="unreadResultsSection">
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <label class="checkbox-wrapper">
+                                    <input type="checkbox" id="unreadSelectAll" onchange="toggleUnreadSelectAll()">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <span class="results-count"><span id="unreadSendersBadge">0</span> senders found</span>
+                            </div>
+                            <div class="toolbar-right" style="display: flex; align-items: center; gap: 16px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label for="unreadDisplayLimit" style="font-size: 13px; color: #5f6368;">Show:</label>
+                                    <select id="unreadDisplayLimit" class="form-select" style="width: auto; padding: 4px 8px;" onchange="GmailCleaner.Unread.changeDisplayLimit()">
+                                        <option value="10">10</option>
+                                        <option value="20" selected>20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #5f6368; cursor: pointer;">
+                                    <input type="checkbox" id="unreadSkipConfirm" style="cursor: pointer;">
+                                    Skip confirmations
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="results-list" id="unreadResultsList" style="max-height: 600px; overflow-y: auto;">
+                            <!-- Filled by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="empty-state" id="unreadNoResults">
+                        <div class="empty-icon">
+                            <svg viewBox="0 0 24 24" width="80" height="80">
+                                <path fill="#dadce0" d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                            </svg>
+                        </div>
+                        <h2>Scan to find unread emails</h2>
+                        <p>We'll group your unread emails by sender so you can quickly clean up your inbox</p>
+                    </div>
+                </div>
+
                 <!-- Delete Emails View -->
                 <div class="view hidden" id="deleteView">
                     <div class="content-header">
@@ -409,7 +550,7 @@
                                         <svg viewBox="0 0 24 24" width="16" height="16">
                                             <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
                                         </svg>
-                                        Delete
+                                        Delete all selected emails
                                     </button>
                                 </div>
                             </div>
@@ -468,6 +609,7 @@
     <script src="/static/js/markread.js?v={{ cache_bust }}"></script>
     <script src="/static/js/delete.js?v={{ cache_bust }}"></script>
     <script src="/static/js/labels.js?v={{ cache_bust }}"></script>
+    <script src="/static/js/unread.js?v={{ cache_bust }}"></script>
     <!-- Litepicker Date Range Picker Library -->
     <script src="https://cdn.jsdelivr.net/npm/litepicker@latest/dist/litepicker.js"></script>
 </body>

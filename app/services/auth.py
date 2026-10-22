@@ -105,6 +105,8 @@ def _try_refresh_creds(creds: Credentials) -> Credentials | None:
         try:
             with open(settings.token_file, "w") as token:
                 token.write(creds.to_json())
+            # Restrict file permissions to owner only (0600)
+            os.chmod(settings.token_file, 0o600)
         except OSError:
             # Token file write failed - creds are refreshed in memory but not saved
             logger.exception("Failed to save refreshed token")
@@ -339,7 +341,26 @@ def get_gmail_service():
                             )
 
                         # Construct redirect URI using external port
-                        redirect_uri = f"http://{settings.oauth_host}:{redirect_port}/"
+                        # Determine scheme: explicit override > hostname heuristic
+                        if settings.oauth_use_https is not None:
+                            # Explicit override takes precedence
+                            scheme = "https" if settings.oauth_use_https else "http"
+                        else:
+                            # Hostname heuristic: HTTP for localhost and Docker internal hosts
+                            localhost_hosts = {
+                                "localhost",
+                                "127.0.0.1",
+                                "::1",
+                                "host.docker.internal",
+                                "gateway.docker.internal",
+                            }
+                            host_lower = settings.oauth_host.lower()
+                            is_local = (
+                                host_lower in localhost_hosts
+                                or host_lower.endswith((".localhost", ".local"))
+                            )
+                            scheme = "http" if is_local else "https"
+                        redirect_uri = f"{scheme}://{settings.oauth_host}:{redirect_port}/"
                         flow.redirect_uri = redirect_uri
                         logger.info(
                             f"Using custom redirect URI {redirect_uri} "
@@ -361,8 +382,7 @@ def get_gmail_service():
                             )
 
                         # Store OAuth state for CSRF protection
-                        with state.oauth_state_lock:
-                            state.oauth_state["state"] = oauth_state
+                        state.set_oauth_state(oauth_state)
                         logger.debug(
                             f"Stored OAuth state for CSRF protection: {oauth_state[:20]}..."
                             if oauth_state and len(oauth_state) > 20
@@ -371,7 +391,7 @@ def get_gmail_service():
 
                         # Set pending auth URL for web auth mode
                         if is_web_auth_mode():
-                            state.pending_auth_url["url"] = authorization_url
+                            state.set_pending_auth_url(authorization_url)
 
                         # Create a simple HTTP server to handle the callback
                         callback_event = threading.Event()
@@ -483,7 +503,7 @@ def get_gmail_service():
                                     exc_info=True,
                                 )
                                 raise ValueError(
-                                    f"Failed to exchange authorization code: {str(e)}. "
+                                    f"Failed to exchange authorization code: {e!s}. "
                                     "Please try signing in again."
                                 ) from e
 
@@ -518,6 +538,8 @@ def get_gmail_service():
                     try:
                         with open(settings.token_file, "w") as token:
                             token.write(new_creds.to_json())
+                        # Restrict file permissions to owner only (0600)
+                        os.chmod(settings.token_file, 0o600)
                         print("OAuth complete! Token saved.")
                     except OSError as e:
                         logger.error(f"Failed to save token file: {e}", exc_info=True)
@@ -583,9 +605,8 @@ def get_gmail_service():
                 finally:
                     # Always reset auth state, even on error
                     _auth_in_progress["active"] = False
-                    state.pending_auth_url["url"] = None
-                    with state.oauth_state_lock:
-                        state.oauth_state["state"] = None
+                    state.set_pending_auth_url(None)
+                    state.set_oauth_state(None)
 
             oauth_thread = threading.Thread(target=run_oauth, daemon=True)
             oauth_thread.start()
@@ -603,16 +624,16 @@ def get_gmail_service():
         # Return error instead of crashing
         return (
             None,
-            f"Failed to connect to Gmail API: {str(e)}. Please try signing in again.",
+            f"Failed to connect to Gmail API: {e!s}. Please try signing in again.",
         )
 
     try:
         profile = service.users().getProfile(userId="me").execute()
-        state.current_user["email"] = profile.get("emailAddress", "Unknown")
-        state.current_user["logged_in"] = True
+        state.update_current_user(
+            email=profile.get("emailAddress", "Unknown"), logged_in=True
+        )
     except Exception:
-        state.current_user["email"] = "Unknown"
-        state.current_user["logged_in"] = True
+        state.update_current_user(email="Unknown", logged_in=True)
 
     return service, None
 
@@ -622,8 +643,8 @@ def sign_out() -> dict:
     if os.path.exists(settings.token_file):
         os.remove(settings.token_file)
 
-    # Reset state
-    state.current_user = {"email": None, "logged_in": False}
+    # Reset state (use thread-safe setter)
+    state.update_current_user(email=None, logged_in=False)
     state.reset_scan()
     state.reset_delete_scan()
     state.reset_mark_read()
@@ -654,19 +675,19 @@ def check_login_status() -> dict:
                 if creds and creds.valid:
                     service = build("gmail", "v1", credentials=creds)
                     profile = service.users().getProfile(userId="me").execute()
-                    state.current_user["email"] = profile.get("emailAddress", "Unknown")
-                    state.current_user["logged_in"] = True
-                    return state.current_user.copy()
+                    state.update_current_user(
+                        email=profile.get("emailAddress", "Unknown"), logged_in=True
+                    )
+                    return state.get_current_user()
                 elif creds and creds.expired and creds.refresh_token:
                     refreshed_creds = _try_refresh_creds(creds)
                     if refreshed_creds:
                         service = build("gmail", "v1", credentials=refreshed_creds)
                         profile = service.users().getProfile(userId="me").execute()
-                        state.current_user["email"] = profile.get(
-                            "emailAddress", "Unknown"
+                        state.update_current_user(
+                            email=profile.get("emailAddress", "Unknown"), logged_in=True
                         )
-                        state.current_user["logged_in"] = True
-                        return state.current_user.copy()
+                        return state.get_current_user()
             except (ValueError, OSError) as e:
                 # Token file is invalid/corrupted
                 logger.warning(f"Failed to load or refresh credentials: {e}")
@@ -679,6 +700,5 @@ def check_login_status() -> dict:
                 # API errors, network issues, etc.
                 logger.error(f"Error checking login status: {e}", exc_info=True)
 
-    state.current_user["email"] = None
-    state.current_user["logged_in"] = False
-    return state.current_user.copy()
+    state.update_current_user(email=None, logged_in=False)
+    return state.get_current_user()

@@ -27,21 +27,19 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
     # Validate input
     if limit <= 0:
         state.reset_scan()
-        state.scan_status["error"] = "Limit must be greater than 0"
-        state.scan_status["done"] = True
+        state.update_scan_status(error="Limit must be greater than 0", done=True)
         return
 
     state.reset_scan()
-    state.scan_status["message"] = "Connecting to Gmail..."
+    state.update_scan_status(message="Connecting to Gmail...")
 
     service, error = get_gmail_service()
     if error:
-        state.scan_status["error"] = error
-        state.scan_status["done"] = True
+        state.update_scan_status(error=error, done=True)
         return
 
     try:
-        state.scan_status["message"] = "Fetching email list..."
+        state.update_scan_status(message="Fetching email list...")
 
         # Build query
         query = build_gmail_query(filters)
@@ -70,12 +68,11 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
                 break
 
         if not message_ids:
-            state.scan_status["message"] = "No emails found"
-            state.scan_status["done"] = True
+            state.update_scan_status(message="No emails found", done=True)
             return
 
         total = len(message_ids)
-        state.scan_status["message"] = f"Found {total} emails. Scanning..."
+        state.update_scan_status(message=f"Found {total} emails. Scanning...")
 
         # Process in batches using Gmail Batch API (100 requests per HTTP call!)
         unsubscribe_data: dict[str, dict] = defaultdict(
@@ -188,9 +185,9 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
             batch.execute()
 
             progress = int((i + len(batch_ids)) / total * 100)
-            state.scan_status["progress"] = progress
-            state.scan_status["message"] = (
-                f"Scanned {processed}/{total} emails ({len(unsubscribe_data)} found)"
+            state.update_scan_status(
+                progress=progress,
+                message=f"Scanned {processed}/{total} emails ({len(unsubscribe_data)} found)",
             )
 
             # Rate limiting - small delay every 5 batches (500 emails)
@@ -217,13 +214,13 @@ def scan_emails(limit: int = 500, filters: Optional[dict] = None):
             reverse=True,
         )
 
-        state.scan_results = sorted_results
-        state.scan_status["message"] = f"Found {len(state.scan_results)} subscriptions"
-        state.scan_status["done"] = True
+        state.set_scan_results(sorted_results)
+        state.update_scan_status(
+            message=f"Found {len(sorted_results)} subscriptions", done=True
+        )
 
     except Exception as e:
-        state.scan_status["error"] = str(e)
-        state.scan_status["done"] = True
+        state.update_scan_status(error=str(e), done=True)
 
 
 def get_scan_status() -> dict:

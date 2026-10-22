@@ -232,12 +232,13 @@ GmailCleaner.Delete = {
 
             if (result.success) {
                 btn.classList.remove('btn-deleting');
-                btn.innerHTML = '✓ Deleted!';
+                btn.innerHTML = `✓ Deleted ${result.deleted}!`;
                 btn.classList.add('success');
+                GmailCleaner.UI.showSuccessToast(`Deleted ${result.deleted} emails from ${r.email}`);
                 setTimeout(() => {
                     GmailCleaner.deleteResults = GmailCleaner.deleteResults.filter((_, i) => i !== index);
                     this.displayResults();
-                }, 1000);
+                }, 1500);
             } else {
                 btn.classList.remove('btn-deleting');
                 btn.innerHTML = 'Error';
@@ -319,6 +320,7 @@ GmailCleaner.Delete = {
                 this.hideDeleteOverlay();
 
                 if (!status.error) {
+                    const deletedCount = status.deleted_count || 0;
                     checkboxes.forEach(cb => {
                         const index = parseInt(cb.dataset.index);
                         const btn = document.getElementById('delete-' + index);
@@ -329,12 +331,14 @@ GmailCleaner.Delete = {
                         }
                     });
 
+                    GmailCleaner.UI.showSuccessToast(`Deleted ${deletedCount.toLocaleString()} emails from ${checkboxes.length} senders`);
+
                     setTimeout(async () => {
                         const resultsResponse = await fetch('/api/delete-scan-results');
                         GmailCleaner.deleteResults = await resultsResponse.json();
                         this.displayResults();
                         document.getElementById('deleteSelectAll').checked = false;
-                    }, 800);
+                    }, 1000);
                 } else {
                     alert('Error: ' + status.error);
                     checkboxes.forEach(cb => {
