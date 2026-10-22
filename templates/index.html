@@ -170,6 +170,24 @@
                                 </svg>
                                 Sign in with Google
                             </button>
+
+                            <!-- Shown once the OAuth flow has produced a consent URL -->
+                            <div class="auth-url-panel hidden" id="authUrlPanel">
+                                <p class="auth-url-status" id="authUrlStatus">Preparing Google sign-in&hellip;</p>
+                                <a class="btn btn-primary" id="authUrlOpen" href="#" target="_blank" rel="noopener noreferrer">
+                                    Continue to Google
+                                </a>
+                                <button class="auth-url-toggle" type="button" id="authUrlToggle" onclick="GmailCleaner.Auth.toggleAuthUrl()">
+                                    Signing in on another device?
+                                </button>
+                                <div class="auth-url-manual hidden" id="authUrlManual">
+                                    <p>Open this link on the device with your browser:</p>
+                                    <div class="auth-url-copy-row">
+                                        <input type="text" id="authUrlInput" readonly aria-label="Authorization URL">
+                                        <button class="btn btn-secondary" type="button" onclick="GmailCleaner.Auth.copyAuthUrl()">Copy</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

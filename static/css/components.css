@@ -1047,3 +1047,67 @@
     font-size: 12px;
     color: var(--text-tertiary);
 }
+
+/* ===== OAuth Authorization URL Panel ===== */
+
+.auth-url-panel {
+    margin: 24px auto 0;
+    padding: 20px;
+    max-width: 520px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+}
+
+.auth-url-status {
+    margin: 0 0 16px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.auth-url-toggle {
+    display: block;
+    margin: 12px auto 0;
+    padding: 0;
+    background: none;
+    border: none;
+    font-size: 13px;
+    color: var(--primary-color);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.auth-url-toggle:hover {
+    color: var(--primary-hover);
+}
+
+.auth-url-manual {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.auth-url-manual p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.auth-url-copy-row {
+    display: flex;
+    gap: 8px;
+}
+
+.auth-url-copy-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    background: var(--hover-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
