@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # Track auth in progress
 _auth_in_progress = {"active": False}
 
+# How long to wait for the user to complete the Google consent screen.
+OAUTH_TIMEOUT_SECONDS = 300
+
 
 def _is_file_empty(file_path: str) -> bool:
     """Check if a file exists and is empty.
@@ -428,7 +431,7 @@ def get_gmail_service():
                                     logger.warning(f"Failed to open browser: {e}")
 
                             # Wait for the callback (with timeout)
-                            timeout = 300  # 5 minutes
+                            timeout = OAUTH_TIMEOUT_SECONDS
                             start_time = time.time()
 
                             # Set socket timeout to allow periodic timeout checks
@@ -500,13 +503,45 @@ def get_gmail_service():
                                     )
                     else:
                         # Use standard run_local_server when ports match
-                        new_creds = flow.run_local_server(
-                            port=settings.oauth_port,
-                            bind_addr=bind_address,
-                            host=settings.oauth_host,
-                            open_browser=open_browser,
-                            prompt="consent",
-                        )
+                        try:
+                            new_creds = flow.run_local_server(
+                                port=settings.oauth_port,
+                                bind_addr=bind_address,
+                                host=settings.oauth_host,
+                                open_browser=open_browser,
+                                prompt="consent",
+                                timeout_seconds=OAUTH_TIMEOUT_SECONDS,
+                            )
+                        except AttributeError as e:
+                            # On timeout the local server returns without a
+                            # request, and google-auth-oauthlib dereferences the
+                            # unset `last_request_uri`. Translate that into the
+                            # timeout it actually is.
+                            #
+                            # The guard has to survive two library generations:
+                            #   <=1.3 raises a bare AttributeError, message
+                            #     "'NoneType' object has no attribute 'replace'".
+                            #   >=1.4 catches that itself and re-raises
+                            #     WSGITimeoutError - which SUBCLASSES AttributeError
+                            #     and carries the message "Timed out waiting for
+                            #     response from authorization server", with no
+                            #     "replace" in it.
+                            # So the exact-type check is deliberate: only a bare
+                            # AttributeError has to match the message, while any
+                            # subclass (i.e. WSGITimeoutError) is already the
+                            # timeout we are looking for. Do NOT "simplify" this
+                            # to isinstance() - that reverts the <=1.3 narrowing.
+                            #
+                            # Matching on e.name == "replace" instead looks tidier
+                            # but is a trap: AttributeError only carries .name when
+                            # raised by real attribute access, so hand-constructed
+                            # errors (as in the tests) have .name == None.
+                            if type(e) is AttributeError and "replace" not in str(e):
+                                raise
+                            raise TimeoutError(
+                                f"OAuth authorization timed out after {OAUTH_TIMEOUT_SECONDS} seconds. "
+                                "Please try signing in again."
+                            ) from e
 
                     # Validate credentials were obtained
                     if new_creds is None:
