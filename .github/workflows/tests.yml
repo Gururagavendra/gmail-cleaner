@@ -2,16 +2,40 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     branches: [main]
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    if: github.repository_owner_id == '45983094' && github.actor_id == '45983094' && github.triggering_actor == 'daddyparodz' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.number == github.event.pull_request.number && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.id == github.event.repository.id && github.event.pull_request.head.repo.id == github.event.repository.id && github.event.pull_request.base.repo.full_name == github.repository && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: [self-hosted, Linux, X64]
+    container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
 
     steps:
+      - name: Bootstrap container
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libsqlite3-0
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Test trusted metadata guards
+        run: node --test tests/ci-metadata.test.cjs tests/ci-coverage.test.cjs
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,9 +67,11 @@ jobs:
         if: ${{ env.ACT == 'true' }}
         run: python -m pytest tests/ -v --cov=app --cov-report=xml
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Preserve coverage report
+        uses: actions/upload-artifact@v4
         if: ${{ env.ACT != 'true' }}
         with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
+          name: coverage-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: coverage.xml
+          if-no-files-found: error
+          retention-days: 1
