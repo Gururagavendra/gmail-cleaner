@@ -102,10 +102,10 @@ test('coverage bootstrap installs required Codecov commands before upload', () =
 test('coverage upload uses supported v5 files input without bypassing validation', () => {
   const step = testsYaml.match(/      - name: Upload coverage to Codecov\r?\n([\s\S]*?)(?=\r?\n      - |$)/)?.[1];
   assert.ok(step, 'actual coverage upload step must exist');
-  assert.match(step, /uses: codecov\/codecov-action@v5\s/);
+  assert.match(step, /uses: codecov\/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac\s/);
   const inputs = Object.fromEntries([...step.matchAll(/^          ([\w-]+): (.+)$/gm)].map(m => [m[1], m[2].trim()]));
   assert.equal(inputs.files, './coverage.xml', 'v5 requires files, not unsupported file');
-  assert.deepEqual(inputs, {files: './coverage.xml', fail_ci_if_error: 'false'});
+  assert.deepEqual(inputs, {files: './coverage.xml', use_oidc: 'true', override_commit: '${{ github.event.pull_request.head.sha || github.sha }}', disable_search: 'true', disable_file_fixes: 'true', plugins: 'noop', fail_ci_if_error: 'true'});
   assert.match(step, /if: \$\{\{ env.ACT != 'true' \}\}/);
   assert.doesNotMatch(step, /continue-on-error/);
 });
@@ -117,7 +117,7 @@ test('owner-only job event guards reject untrusted event paths', () => {
   const sources = [testsYaml, yaml];
   for (const [i, source] of sources.entries()) {
     const guards = [...source.matchAll(/^    if: (.+)$/gm)].map(m => m[1].trim());
-    assert.equal(guards.length, i === 0 ? 1 : 2);
+    assert.equal(guards.length, 2);
     for (const guard of guards) {
       const allows = github => new Function('github', 'startsWith', `return (${guard});`)(github, (s, p) => s.startsWith(p));
       const owner = {repository_owner_id: '45983094', actor_id: '45983094', triggering_actor: 'daddyparodz', event_name: 'workflow_dispatch', ref: 'refs/heads/main'};
